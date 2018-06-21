@@ -65,7 +65,7 @@ SETUP_METADATA = \
                                language="c++",
                                extra_compile_args=EXTRA_COMPILE_ARGS,
                                extra_link_args=EXTRA_LINK_ARGS)],
-    "install_requires": ["screed>=0.9", "ijson", "khmer>=2.1<3.0"],
+    "install_requires": ["screed>=0.9", "ijson", "khmer>=2.1<3.0", "duecredit>=0.6.3"],
     "setup_requires": ['Cython>=0.25.2', "setuptools>=18.0"],
     "extras_require": {
         'test' : ['pytest', 'pytest-cov', 'numpy', 'matplotlib', 'scipy','recommonmark'],
