@@ -1,14 +1,15 @@
 """
 Utility functions for dealing with input args to the sourmash command line.
 """
+import collections
 import sys
 import os
 from . import signature
 from .logging import notify, error
 
 from . import signature as sig
-from .sbt import SBT
-from .sbtmh import SigLeaf
+from .sbt import SBT, Node
+from .sbtmh import SigLeaf, select_signature
 
 DEFAULT_LOAD_K=31
 
@@ -189,13 +190,20 @@ def check_signatures_are_compatible(query, subject):
 
 
 def check_tree_is_compatible(treename, tree, query, is_similarity_query):
-    leaf = next(iter(tree.leaves()))
-    tree_mh = leaf.data.minhash
-
     query_mh = query.minhash
 
-    if tree_mh.ksize != query_mh.ksize:
-        error("ksize on tree '{}' is {};", treename, tree_mh.ksize)
+    leaf = next(iter(tree.leaves()))
+    tree_mh = select_signature(leaf, query)
+    if tree_mh is None:
+        error("tree '{}' is not compatible", treename)
+        error('this is different from query ksize of {}.', query_mh.ksize)
+        return 0
+
+    tree_mh = tree_mh.minhash
+
+    tree_ksize = get_ksize(tree)
+    if tree_ksize != query_mh.ksize:
+        error("ksize on tree '{}' is {};", treename, tree_ksize)
         error('this is different from query ksize of {}.', query_mh.ksize)
         return 0
 
@@ -219,6 +227,32 @@ def check_tree_is_compatible(treename, tree, query, is_similarity_query):
         return 0
 
     return 1
+
+
+def get_ksize(tree):
+    """Walk nodes in `tree` to find out ksizes"""
+    try:
+        return tree.nodes[0].data.ksize()
+    except AttributeError:
+        return get_all_ksizes(tree)
+
+
+def get_all_ksizes(tree):
+    """Walk nodes in `tree` to find out all ksizes"""
+    ksizes = set()
+    for node in tree.nodes.values():
+        if isinstance(node, Node):
+            return node.data.ksize()
+        elif isinstance(node, SigLeaf):
+            if isinstance(node.data, collections.Sequence):
+                ksizes |= {q.minhash.ksize for q in node.data}
+            else:
+                ksizes |= node.data.minhash.ksize
+
+    if len(ksizes) == 1:
+        return ksizes.pop()
+
+    return ksizes
 
 
 def load_sbts_and_sigs(filenames, query, is_similarity_query, traverse=False):

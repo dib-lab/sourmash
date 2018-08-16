@@ -605,7 +605,9 @@ class SBT(object):
             for child in children:
                 if child.node is not None:
                     if isinstance(child.node, Leaf):
-                        min_n_below = min(len(child.node.data.minhash), min_n_below)
+                        # TODO: what if there is more than one?
+                        child_mh = child.node.data[0].minhash
+                        min_n_below = min(len(child_mh), min_n_below)
                     else:
                         child_n = child.node.metadata.get('min_n_below', sys.maxsize)
                         min_n_below = min(child_n, min_n_below)

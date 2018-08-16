@@ -4,7 +4,9 @@ import sys
 
 from .logging import notify, error
 from .signature import SourmashSignature
-from .sbtmh import search_minhashes, search_minhashes_containment
+from .sbtmh import (search_minhashes,
+                    search_minhashes_containment,
+                    select_signature)
 from .sbtmh import SearchMinHashesFindBest, SearchMinHashesFindBestIgnoreMaxHash
 from ._minhash import get_max_hash_for_scaled
 
@@ -45,17 +47,18 @@ def search_databases(query, databases, threshold, do_containment, best_only):
 
             tree = sbt_or_siglist
             for leaf in tree.find(search_fn, query, threshold):
-                similarity = query_match(leaf.data)
+                leafdata = select_signature(leaf, query)
+                similarity = query_match(leafdata)
 
                 # tree search should always/only return matches above threshold
                 assert similarity >= threshold
 
-                if leaf.data.md5sum() not in found_md5:
+                if leafdata.md5sum() not in found_md5:
                     sr = SearchResult(similarity=similarity,
-                                      match_sig=leaf.data,
-                                      md5=leaf.data.md5sum(),
+                                      match_sig=leafdata,
+                                      md5=leafdata.md5sum(),
                                       filename=filename,
-                                      name=leaf.data.name())
+                                      name=leafdata.name())
                     found_md5.add(sr.md5)
                     results.append(sr)
 
@@ -108,10 +111,11 @@ def gather_databases(query, databases, threshold_bp, ignore_abundance):
                 search_fn = SearchMinHashesFindBestIgnoreMaxHash().search
 
                 for leaf in tree.find(search_fn, query, 0.0):
-                    leaf_e = leaf.data.minhash
+                    leafdata = select_signature(leaf, query)
+                    leaf_e = leafdata.minhash
                     similarity = query.minhash.similarity_ignore_maxhash(leaf_e)
                     if similarity > 0.0:
-                        results.append((similarity, leaf.data))
+                        results.append((similarity, leafdata))
 
             # search a signature
             else:

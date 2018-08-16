@@ -1,5 +1,6 @@
 from __future__ import print_function, unicode_literals
 
+import collections
 import os
 
 import pytest
@@ -518,3 +519,62 @@ def test_save_sparseness(n_children):
             # Leaf nodes can't have children
             if isinstance(node, Leaf):
                 assert all(c.node is None for c in tree_loaded.children(pos))
+
+
+def test_tree_full_signature(n_children):
+    factory = GraphFactory(31, 1e5, 4)
+    tree = SBT(factory, d=n_children)
+
+    with utils.TempDirectory() as location:
+        testdata1 = utils.get_test_data('short.fa')
+        testdata2 = utils.get_test_data('short2.fa')
+        testdata3 = utils.get_test_data('short3.fa')
+        sigfiles = [os.path.join(location, "short{}.fa.sig".format(f))
+                    for f in ("", "2", "3")]
+
+        status, out, err = utils.runscript('sourmash',
+                                           ['compute', '-k', '31', '-o',
+                                            sigfiles[0],
+                                            testdata1],
+                                           in_directory=location)
+
+        status, out, err = utils.runscript('sourmash',
+                                           ['compute', '-k', '21,31', '-o',
+                                            sigfiles[1],
+                                            testdata2],
+                                           in_directory=location)
+
+        status, out, err = utils.runscript('sourmash',
+                                           ['compute', '-k', '21,31,51', '-o',
+                                            sigfiles[2],
+                                            testdata3],
+                                           in_directory=location)
+
+        for f in sigfiles:
+            sig = list(signature.load_signatures(utils.get_test_data(f)))
+            leaf = SigLeaf(os.path.basename(f), sig)
+            tree.add_node(leaf)
+            to_search = leaf
+
+        print('*' * 60)
+        print("{}:".format(to_search.metadata))
+
+        query = to_search.data
+        if isinstance(query, collections.Sequence):
+            query = next(q for q in query if q.minhash.ksize == 31)
+
+        old_result = {str(s) for s in tree.find(search_minhashes,
+                                                query, 0.1)}
+        print(*old_result, sep='\n')
+
+        tree.save(os.path.join(location, 'demo'))
+        tree = SBT.load(os.path.join(location, 'demo'),
+                        leaf_loader=SigLeaf.load)
+
+        print('*' * 60)
+        print("{}:".format(to_search.metadata))
+        new_result = {str(s) for s in tree.find(search_minhashes,
+                                                query, 0.1)}
+        print(*new_result, sep='\n')
+
+        assert old_result == new_result
