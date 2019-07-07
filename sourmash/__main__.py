@@ -8,8 +8,8 @@ import argparse
 from .logging import error, set_quiet
 
 from .commands import (categorize, compare, compute, dump, import_csv,
-                       gather, index, sbt_combine, search,
-                       plot, watch, info, storage, migrate, multigather)
+                       gather, index, sbt_combine, search, plot, watch,
+                       info, storage, migrate, multigather, prepare)
 from .lca import main as lca_main
 from .sig import main as sig_main
 
@@ -64,7 +64,9 @@ def main():
                 'migrate': migrate,
                 'multigather': multigather,
                 'sig': sig_main,
-                'signature': sig_main}
+                'signature': sig_main,
+                'prepare': prepare
+               }
     parser = argparse.ArgumentParser(
         description='work with compressed biological sequence representations')
     parser.add_argument('command', nargs='?')

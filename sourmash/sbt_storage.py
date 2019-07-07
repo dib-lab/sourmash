@@ -4,6 +4,7 @@ import abc
 from io import BytesIO
 import os
 import tarfile
+import zipfile
 
 
 class Storage(abc.ABCMeta(str('ABC'), (object,), {'__slots__': ()})):
@@ -56,6 +57,41 @@ class FSStorage(Storage):
         return out.getvalue()
 
 
+class ZipStorage(Storage):
+
+    def __init__(self, path=None):
+        # TODO: leave it open, or close/open every time?
+
+        if path is None:
+            # TODO: Open a temporary file?
+            pass
+
+        self.path = os.path.abspath(path)
+
+        dirname = os.path.dirname(self.path)
+        if not os.path.exists(dirname):
+            os.makedirs(dirname)
+
+        if os.path.exists(self.path):
+            self.zipfile = zipfile.ZipFile(path, 'r')
+        else:
+            self.zipfile = zipfile.ZipFile(path, mode='w',
+                                           compression=zipfile.ZIP_DEFLATED)
+
+    def save(self, path, content):
+        self.zipfile.writestr(path, content)
+        return path
+
+    def load(self, path):
+        return self.zipfile.read(path)
+
+    def init_args(self):
+        return {'path': self.path}
+
+    def __exit__(self, type, value, traceback):
+        self.zipfile.close()
+
+
 class TarStorage(Storage):
 
     def __init__(self, path=None):
@@ -103,10 +139,23 @@ class IPFSStorage(Storage):
         import ipfshttpclient
         self.ipfs_args = kwargs
         self.pin_on_add = pin_on_add
-        self.api = ipfshttpclient.connect(**self.ipfs_args)
+        self.read_only = False
+
+        if 'preload' in self.ipfs_args:
+            del self.ipfs_args['preload']
+
+        try:
+            self.api = ipfshttpclient.connect(**self.ipfs_args)
+        except ipfsapi.exceptions.ConnectionError:
+            self.api = ipfsapi.connect('ipfs.io', 80)
+            self.read_only = True
 
     def save(self, path, content):
         # api.add_bytes(b"Mary had a little lamb")
+        if self.read_only:
+            raise NotImplementedError('This is a read-only client. '
+                                      'Start an IPFS node to be able to save '
+                                      'data.')
         new_obj = self.api.add_bytes(content)
         if self.pin_on_add:
             self.api.pin.add(new_obj)

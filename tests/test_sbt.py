@@ -3,13 +3,14 @@ from __future__ import print_function, unicode_literals
 import os
 
 import pytest
+import shutil
 
 from sourmash import signature
 from sourmash.sbt import SBT, GraphFactory, Leaf, Node
 from sourmash.sbtmh import (SigLeaf, search_minhashes,
-                                search_minhashes_containment)
-from sourmash.sbt_storage import (FSStorage, TarStorage,
-                                      RedisStorage, IPFSStorage)
+                            search_minhashes_containment)
+from sourmash.sbt_storage import (FSStorage, TarStorage, RedisStorage,
+                                  ZipStorage)
 
 from . import sourmash_tst_utils as utils
 
@@ -130,42 +131,25 @@ def test_longer_search(n_children):
     assert set(try3) == set([ 'd', 'e' ]), try3
 
 
-def test_tree_v1_load():
-    tree_v1 = SBT.load(utils.get_test_data('v1.sbt.json'),
-                       leaf_loader=SigLeaf.load)
+@pytest.mark.parametrize("old_version",
+                         ['v1', 'v2', 'v3', 'v4'])
+def test_tree_load_old_versions(old_version):
+    tree_old = SBT.load(utils.get_test_data(old_version + '.sbt.json'),
+                        leaf_loader=SigLeaf.load)
 
-    tree_cur = SBT.load(utils.get_test_data('v3.sbt.json'),
+    tree_cur = SBT.load(utils.get_test_data('v5.sbt.json'),
                         leaf_loader=SigLeaf.load)
 
     testdata1 = utils.get_test_data(utils.SIG_FILES[0])
     to_search = next(signature.load_signatures(testdata1))
 
-    results_v1 = {str(s) for s in tree_v1.find(search_minhashes_containment,
-                                               to_search, 0.1)}
+    results_old = {str(s) for s in tree_old.find(search_minhashes_containment,
+                                                 to_search, 0.1)}
     results_cur = {str(s) for s in tree_cur.find(search_minhashes_containment,
                                                  to_search, 0.1)}
 
-    assert results_v1 == results_cur
-    assert len(results_v1) == 4
-
-
-def test_tree_v2_load():
-    tree_v2 = SBT.load(utils.get_test_data('v2.sbt.json'),
-                       leaf_loader=SigLeaf.load)
-
-    tree_cur = SBT.load(utils.get_test_data('v3.sbt.json'),
-                        leaf_loader=SigLeaf.load)
-
-    testdata1 = utils.get_test_data(utils.SIG_FILES[0])
-    to_search = next(signature.load_signatures(testdata1))
-
-    results_v2 = {str(s) for s in tree_v2.find(search_minhashes_containment,
-                                               to_search, 0.1)}
-    results_cur = {str(s) for s in tree_cur.find(search_minhashes_containment,
-                                                 to_search, 0.1)}
-
-    assert results_v2 == results_cur
-    assert len(results_v2) == 4
+    assert results_old == results_cur
+    assert len(results_old) == 4
 
 
 def test_tree_save_load(n_children):
@@ -285,7 +269,7 @@ def test_sbt_combine(n_children):
 
     # check if adding a new node will use the next empty position
     next_empty = 0
-    for n, d in enumerate(tree_1.nodes):
+    for n, (d, _) in enumerate(tree_1):
         if n != d:
             next_empty = n
             break
@@ -363,9 +347,7 @@ def test_sbt_tarstorage():
             assert old_result == new_result
 
 
-def test_sbt_ipfsstorage():
-    ipfshttpclient = pytest.importorskip('ipfshttpclient')
-
+def test_sbt_zipstorage():
     factory = GraphFactory(31, 1e5, 4)
     with utils.TempDirectory() as location:
         tree = SBT(factory)
@@ -382,13 +364,10 @@ def test_sbt_ipfsstorage():
                                                 to_search.data, 0.1)}
         print(*old_result, sep='\n')
 
-        try:
-            with IPFSStorage() as storage:
-                tree.save(os.path.join(location, 'tree'), storage=storage)
-        except ipfshttpclient.exceptions.ConnectionError:
-            pytest.xfail("ipfs not installed/functioning probably")
+        with ZipStorage(os.path.join(location, 'tree.zip')) as storage:
+            tree.save(os.path.join(location, 'tree'), storage=storage)
 
-        with IPFSStorage() as storage:
+        with ZipStorage(os.path.join(location, 'tree.zip')) as storage:
             tree = SBT.load(os.path.join(location, 'tree'),
                             leaf_loader=SigLeaf.load,
                             storage=storage)
@@ -440,6 +419,23 @@ def test_sbt_redisstorage():
             assert old_result == new_result
 
 
+def test_load_zip(tmpdir):
+    testdata = utils.get_test_data("v5.zip")
+    testsbt = tmpdir.join("v5.zip")
+
+    shutil.copyfile(testdata, str(testsbt))
+
+    tree = SBT.load(str(testsbt), leaf_loader=SigLeaf.load)
+
+    to_search = signature.load_one_signature(utils.get_test_data(utils.SIG_FILES[0]))
+
+    print("*" * 60)
+    print("{}:".format(to_search))
+    new_result = {str(s) for s in tree.find(search_minhashes, to_search, 0.1)}
+    print(*new_result, sep="\n")
+    assert len(new_result) == 2
+
+
 def test_tree_repair():
     tree_repair = SBT.load(utils.get_test_data('leaves.sbt.json'),
                            leaf_loader=SigLeaf.load)
@@ -468,7 +464,7 @@ def test_tree_repair_add_node():
         leaf = SigLeaf(os.path.basename(f), sig)
         tree_repair.add_node(leaf)
 
-    for pos, node in list(tree_repair.nodes.items()):
+    for pos, node in tree_repair:
         # Every parent of a node must be an internal node (and not a leaf),
         # except for node 0 (the root), whose parent is None.
         if pos != 0:
@@ -499,7 +495,7 @@ def test_save_sparseness(n_children):
         tree.save(os.path.join(location, 'demo'), sparseness=1.0)
         tree_loaded = SBT.load(os.path.join(location, 'demo'),
                                leaf_loader=SigLeaf.load)
-        assert all(not isinstance(n, Node) for n in tree_loaded.nodes.values())
+        assert all(not isinstance(n, Node) for _, n in tree_loaded)
 
         print('*' * 60)
         print("{}:".format(to_search.metadata))
@@ -509,7 +505,7 @@ def test_save_sparseness(n_children):
 
         assert old_result == new_result
 
-        for pos, node in list(tree_loaded.nodes.items()):
+        for pos, node in tree_loaded:
             # Every parent of a node must be an internal node (and not a leaf),
             # except for node 0 (the root), whose parent is None.
             if pos != 0:

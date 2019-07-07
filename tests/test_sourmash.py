@@ -1508,7 +1508,7 @@ def test_do_sourmash_sbt_search_check_bug():
         assert '1 matches:' in out
 
         tree = load_sbt_index(os.path.join(location, 'zzz.sbt.json'))
-        assert tree.nodes[0].metadata['min_n_below'] == 431
+        assert tree._nodes[0].metadata['min_n_below'] == 431
 
 
 def test_do_sourmash_sbt_search_empty_sig():
@@ -1532,7 +1532,7 @@ def test_do_sourmash_sbt_search_empty_sig():
         assert '1 matches:' in out
 
         tree = load_sbt_index(os.path.join(location, 'zzz.sbt.json'))
-        assert tree.nodes[0].metadata['min_n_below'] == 1
+        assert tree._nodes[0].metadata['min_n_below'] == 1
 
 
 def test_do_sourmash_sbt_move_and_search_output():
@@ -3519,44 +3519,6 @@ def test_watch_coverage():
         assert 'FOUND: genome-s10.fa.gz, at 1.000' in out
 
 
-def test_storage_convert():
-    import pytest
-
-    with utils.TempDirectory() as location:
-        testdata = utils.get_test_data('v2.sbt.json')
-        shutil.copyfile(testdata, os.path.join(location, 'v2.sbt.json'))
-        shutil.copytree(os.path.join(os.path.dirname(testdata), '.sbt.v2'),
-                        os.path.join(location, '.sbt.v2'))
-        testsbt = os.path.join(location, 'v2.sbt.json')
-
-        original = SBT.load(testsbt, leaf_loader=SigLeaf.load)
-
-        args = ['storage', 'convert', '-b', 'ipfs', testsbt]
-        status, out, err = utils.runscript('sourmash', args,
-                                           in_directory=location, fail_ok=True)
-        if not status and "ipfs.exceptions.ConnectionError" in err:
-            raise pytest.xfail('ipfs probably not running')
-
-        ipfs = SBT.load(testsbt, leaf_loader=SigLeaf.load)
-
-        assert len(original.nodes) == len(ipfs.nodes)
-        assert all(n1[1].name == n2[1].name
-                   for (n1, n2) in zip(sorted(original.nodes.items()),
-                                       sorted(ipfs.nodes.items())))
-
-        args = ['storage', 'convert',
-                '-b', """'TarStorage("{}")'""".format(
-                    os.path.join(location, 'v2.sbt.tar.gz')),
-                testsbt]
-        status, out, err = utils.runscript('sourmash', args,
-                                           in_directory=location)
-        tar = SBT.load(testsbt, leaf_loader=SigLeaf.load)
-
-        assert len(original.nodes) == len(tar.nodes)
-        assert all(n1[1].name == n2[1].name
-                   for (n1, n2) in zip(sorted(original.nodes.items()),
-                                       sorted(tar.nodes.items())))
-
 def test_storage_convert_identity():
     with utils.TempDirectory() as location:
         testdata = utils.get_test_data('v2.sbt.json')
@@ -3573,10 +3535,9 @@ def test_storage_convert_identity():
 
         identity = SBT.load(testsbt, leaf_loader=SigLeaf.load)
 
-        assert len(original.nodes) == len(identity.nodes)
+        assert len(original) == len(identity)
         assert all(n1[1].name == n2[1].name
-                   for (n1, n2) in zip(sorted(original.nodes.items()),
-                                       sorted(identity.nodes.items())))
+                   for (n1, n2) in zip(sorted(original), sorted(identity)))
 
 
 def test_storage_convert_fsstorage_newpath():
@@ -3597,10 +3558,9 @@ def test_storage_convert_fsstorage_newpath():
 
         identity = SBT.load(testsbt, leaf_loader=SigLeaf.load)
 
-        assert len(original.nodes) == len(identity.nodes)
+        assert len(original) == len(identity)
         assert all(n1[1].name == n2[1].name
-                   for (n1, n2) in zip(sorted(original.nodes.items()),
-                                       sorted(identity.nodes.items())))
+                   for (n1, n2) in zip(sorted(original), sorted(identity)))
 
 
 def test_migrate():
@@ -3618,14 +3578,14 @@ def test_migrate():
 
         identity = SBT.load(testsbt, leaf_loader=SigLeaf.load)
 
-        assert len(original.nodes) == len(identity.nodes)
+        assert len(original) == len(identity)
         assert all(n1[1].name == n2[1].name
-                   for (n1, n2) in zip(sorted(original.nodes.items()),
-                                       sorted(identity.nodes.items())))
+                   for (n1, n2) in zip(sorted(original),
+                                       sorted(identity)))
 
         assert "this is an old index version" not in err
         assert all('min_n_below' in node.metadata
-                       for node in identity.nodes.values()
+                       for node in identity
                        if isinstance(node, Node))
 
 

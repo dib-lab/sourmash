@@ -8,6 +8,8 @@ import os
 import os.path
 import sys
 import random
+import shutil
+import tempfile
 
 import screed
 from .sourmash_args import SourmashArgumentParser
@@ -753,7 +755,7 @@ def index(args):
             scaleds.add(ss.minhash.scaled)
 
             leaf = SigLeaf(ss.md5sum(), ss)
-            tree.add_node(leaf)
+            tree.add_node(leaf, update_internal=False)
             n += 1
 
         if not ss:
@@ -1402,3 +1404,47 @@ def migrate(args):
 
     notify('saving SBT under "{}".', args.sbt_name)
     tree.save(args.sbt_name, structure_only=True)
+
+
+def prepare(args):
+    from .sbt import parse_backend_args
+    from .sbt_storage import FSStorage
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('sbt_name', help='name of SBT to prepare')
+    parser.add_argument('-x', help='new nodegraph size', default=1e5)
+    parser.add_argument('-b', "--backend", type=str,
+                        help='Backend to convert to',
+                        default='FSStorage')
+    args = parser.parse_args(args)
+
+    notify('saving SBT under "{}".', args.sbt_name)
+
+    backend, options = parse_backend_args(args.sbt_name, args.backend)
+
+    with backend(*options) as storage:
+        with open(args.sbt_name, 'r') as f:
+            import json
+            temptree = json.load(f)
+
+        if ((temptree['storage']['backend'] == 'IPFSStorage') and
+            (backend == FSStorage) and
+            ('preload' in temptree['storage']['args'])):
+                # Let's take a shortcut... The preload multihash contains the
+                # directory in the same structure FSStorage expects.
+                ipfs_args = temptree['storage']['args']
+                multihash = ipfs_args.pop('preload')
+
+                # TODO: in case the IPFS node is not available, need to
+                # fallback to read-only client
+                import ipfsapi
+                client = ipfsapi.connect(**ipfs_args)
+
+                dirpath = os.path.join(storage.location, storage.subdir)
+                with tempfile.TemporaryDirectory() as temp:
+                    client.get(multihash, filepath=temp)
+                    shutil.rmtree(dirpath)
+                    shutil.move(os.path.join(temp, multihash), dirpath)
+
+        sbt = load_sbt_index(args.sbt_name, print_version_warning=False)
+        sbt.save(args.sbt_name, storage=storage)
