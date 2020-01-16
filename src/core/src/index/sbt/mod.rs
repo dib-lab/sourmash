@@ -1,13 +1,7 @@
 pub mod mhbt;
 
-/* FIXME: bring back after boomphf changes
-pub mod ukhs;
-*/
-
-/* FIXME: bring back after MQF works on macOS and Windows
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(feature = "mqf-sketch")]
 pub mod mhmt;
-*/
 
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};

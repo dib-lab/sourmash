@@ -72,7 +72,17 @@ jobs:
           args: --no-fail-fast
 
   test_all_features:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        build: [linux, macos]
+        include:
+          - build: macos
+            os: macos-latest
+          - build: linux
+            os: ubuntu-latest
+          # Someday: add windows here
     steps:
       - uses: actions/checkout@v1
 
@@ -177,7 +187,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: clippy
-          args: -- -D warnings
+          args: --all --all-features -- -D warnings
 
   wasm-pack:
     name: Check if wasm-pack builds a valid package for the sourmash crate

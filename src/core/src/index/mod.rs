@@ -29,15 +29,10 @@ use crate::sketch::Sketch;
 
 pub type MHBT = SBT<Node<Nodegraph>, Signature>;
 
-/* FIXME: bring back after MQF works on macOS and Windows
-use cfg_if::cfg_if;
-cfg_if! {
-    if #[cfg(not(target_arch = "wasm32"))] {
-      use mqf::MQF;
-      pub type MHMT = SBT<Node<MQF>, Signature>;
-    }
-}
-*/
+#[cfg(feature = "mqf-sketch")]
+use mqf::MQF;
+#[cfg(feature = "mqf-sketch")]
+pub type MHMT = SBT<Node<MQF>, Signature>;
 
 pub trait Index<'a> {
     type Item: Comparable<Self::Item>;
