@@ -21,12 +21,16 @@ from sourmash import signature
 from sourmash import VERSION
 
 
-def test_do_sourmash_compute():
+def test_do_sourmash_compute(cli):
     with utils.TempDirectory() as location:
         testdata1 = utils.get_test_data('short.fa')
-        status, out, err = utils.runscript('sourmash',
-                                           ['compute', '-k', '31', testdata1],
-                                           in_directory=location)
+
+        with utils.working_dir(location):
+            if cli:
+                status, out, err = utils.runscript('sourmash',
+                                                   ['compute', '-k', '31', testdata1])
+            else:
+                sourmash.command_compute.compute([testdata1], ksizes=[31])
 
         sigfile = os.path.join(location, 'short.fa.sig')
         assert os.path.exists(sigfile)
@@ -35,7 +39,7 @@ def test_do_sourmash_compute():
         assert sig.name().endswith('short.fa')
 
 
-def test_do_sourmash_compute_output_valid_file():
+def test_do_sourmash_compute_output_valid_file(cli):
     """ Trigger bug #123 """
     with utils.TempDirectory() as location:
         testdata1 = utils.get_test_data('short.fa')
@@ -43,11 +47,16 @@ def test_do_sourmash_compute_output_valid_file():
         testdata3 = utils.get_test_data('short3.fa')
         sigfile = os.path.join(location, 'short.fa.sig')
 
-        status, out, err = utils.runscript('sourmash',
-                                           ['compute', '-k', '31', '-o', sigfile,
-                                            testdata1,
-                                            testdata2, testdata3],
-                                           in_directory=location)
+        with utils.working_dir(location):
+            if cli:
+                status, out, err = utils.runscript('sourmash',
+                                                   ['compute', '-k', '31', '-o', sigfile,
+                                                    testdata1,
+                                                    testdata2, testdata3])
+            else:
+                sourmash.command_compute.compute([testdata1, testdata2, testdata3],
+                                                 ksizes=[31],
+                                                 output=sigfile)
 
         assert os.path.exists(sigfile)
         assert not out # stdout should be empty

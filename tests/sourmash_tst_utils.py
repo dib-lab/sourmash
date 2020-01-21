@@ -1,6 +1,7 @@
 "Various utilities used by sourmash tests."
 
 from __future__ import print_function
+import contextlib
 import sys
 import os
 import tempfile
@@ -115,6 +116,9 @@ def runscript(scriptname, args, **kwargs):
         sys.stdout, sys.stderr = oldout, olderr
 
         os.chdir(cwd)
+
+    if status is None:
+        status = 0
 
     if status != 0 and not fail_ok:
         print(out)
@@ -257,3 +261,14 @@ def run_shell_cmd(cmd, fail_ok=False, in_directory=None):
         return (proc.returncode, out, err)
     finally:
         os.chdir(cwd)
+
+
+@contextlib.contextmanager
+def working_dir(path):
+    """Changes working directory and returns to previous on exit."""
+    prev_cwd = os.getcwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(prev_cwd)
