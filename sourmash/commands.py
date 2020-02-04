@@ -56,8 +56,9 @@ def compare(args):
 
     # load in the various signatures
     siglist = []
-    ksizes = set()
-    moltypes = set()
+
+    compat_check = sourmash_args.CheckCompatibleSignatures()
+
     for filename in inp_files:
         notify('loading {}', filename, end='\r')
         loaded = sig.load_signatures(filename,
@@ -66,45 +67,30 @@ def compare(args):
         loaded = list(loaded)
         if not loaded:
             notify('\nwarning: no signatures loaded at given ksize/molecule type from {}', filename)
+            continue
+
+        try:
+            compat_check.check_list(loaded)
+        except ValueError as e:
+            error("\na signature in {} is incompatible with other signatures.",
+                  filename)
+            error(str(e))
+
+            if compat_check.problem == 'ksize':
+                error('multiple k-mer sizes loaded; please specify one with -k.')
+            elif compat_check.problem == 'moltype':
+                error('multiple molecule types loaded; please specify --dna, --protein')
+            elif compat_check.problem == 'sigtype':
+                error('cannot mix scaled signatures with bounded signatures')
+            sys.exit(-1)
         siglist.extend(loaded)
-
-        # track ksizes/moltypes
-        for s in loaded:
-            ksizes.add(s.minhash.ksize)
-            moltypes.add(sourmash_args.get_moltype(s))
-
-        # error out while loading if we have more than one ksize/moltype
-        if len(ksizes) > 1 or len(moltypes) > 1:
-            break
-
-    # check ksizes and type
-    if len(ksizes) > 1:
-        error('multiple k-mer sizes loaded; please specify one with -k.')
-        ksizes = sorted(ksizes)
-        error('(saw k-mer sizes {})'.format(', '.join(map(str, ksizes))))
-        sys.exit(-1)
-
-    if len(moltypes) > 1:
-        error('multiple molecule types loaded; please specify --dna, --protein')
-        sys.exit(-1)
 
     notify(' '*79, end='\r')
     notify('loaded {} signatures total.'.format(len(siglist)))
 
-    # check to make sure they're potentially compatible - either using
-    # max_hash/scaled, or not.
-    scaled_sigs = [s.minhash.max_hash for s in siglist]
-    is_scaled = all(scaled_sigs)
-    is_scaled_2 = any(scaled_sigs)
-
-    # complain if it's not all one or the other
-    if is_scaled != is_scaled_2:
-        error('cannot mix scaled signatures with bounded signatures')
-        sys.exit(-1)
-
     # if using --scaled, downsample appropriately
     printed_scaled_msg = False
-    if is_scaled:
+    if compat_check.sigtype == 'scaled':
         max_scaled = max(s.minhash.scaled for s in siglist)
         for s in siglist:
             if s.minhash.scaled != max_scaled:

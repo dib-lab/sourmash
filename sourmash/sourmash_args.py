@@ -33,6 +33,65 @@ def get_moltype(sig, require=False):
     return moltype
 
 
+def get_sigtype(sig):
+    if sig.minhash.scaled:
+        return 'scaled'
+    elif sig.minhash.num:
+        return 'bounded'
+    else:
+        raise Exception("unknown signature type")
+
+
+class CheckCompatibleSignatures(object):
+    "Track compatibility of a bunch of signatures."
+    def __init__(self):
+        self.ksize = None
+        self.moltype = None
+        self.sigtype = None
+        self.problem = None
+
+    def check(self, new_sig):
+        """Check new signature against previous ksize/moltype/sigtype.
+
+        If this is the first signature, record it for future checks."""
+
+        ksize = new_sig.minhash.ksize
+        moltype = get_moltype(new_sig)
+        sigtype = get_sigtype(new_sig)
+
+        if self.ksize is None:
+            self.ksize = ksize
+        elif ksize != self.ksize:
+            self.problem = 'ksize'
+            raise ValueError("new ksize {}, vs previous {} ".format(ksize,
+                                                                self.ksize))
+        else:
+            assert ksize == self.ksize
+
+        if self.moltype is None:
+            self.moltype = moltype
+            self.problem = 'moltype'
+        elif moltype != self.moltype:
+            raise ValueError("new moltype {}, vs previous {}".format(moltype,
+                                                                self.moltype))
+        else:
+            assert moltype == self.moltype
+
+        if self.sigtype is None:
+            self.sigtype = sigtype
+        elif sigtype != self.sigtype:
+            self.problem = 'sigtype'
+            raise ValueError("new sigtype {}, vs previous {}".format(sigtype,
+                                                                self.sigtype))
+        else:
+            assert sigtype == self.sigtype
+
+    def check_list(self, siglist):
+        "Check multiple signatures."
+        for s in siglist:
+            self.check(s)
+
+
 def calculate_moltype(args, default=None):
     if args.protein:
         if args.dna is True:

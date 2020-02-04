@@ -267,8 +267,9 @@ def test_do_compare_output_multiple_k():
         print(status, out, err)
 
         assert status == -1
+        assert 'a signature in short2.fa.sig is incompatible with other signatures.' in err
+        assert 'new ksize 31, vs previous 21' in err
         assert 'multiple k-mer sizes loaded; please specify one' in err
-        assert '(saw k-mer sizes 21, 31)' in err
 
 
 def test_do_compare_output_multiple_moltype():
@@ -289,8 +290,11 @@ def test_do_compare_output_multiple_moltype():
                                            fail_ok=True)
 
         assert status == -1
-        assert 'multiple molecule types loaded;' in err
-
+        print(out)
+        print(err)
+        assert 'a signature in short2.fa.sig is incompatible with other signatures.' in err
+        assert 'new moltype protein, vs previous DNA' in err
+        assert 'multiple molecule types loaded; please specify --dna, --protein' in err
 
 
 def test_do_compare_dayhoff():
@@ -845,6 +849,11 @@ def test_compare_no_choose_molecule_fail():
                                            in_directory=location,
                                            fail_ok=True)
 
+        print(out)
+        print(err)
+
+        assert 'a signature in short.fa.sig is incompatible with other signatures.' in err
+        assert 'new moltype DNA, vs previous protein' in err
         assert 'multiple molecule types loaded; please specify' in err
         assert status != 0
 
