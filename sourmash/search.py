@@ -81,6 +81,7 @@ def _find_best(dblist, query, threshold_bp):
     best_filename = None
 
     # search across all databases
+    # @CTB filetype no longer needed here
     for (obj, filename, filetype) in dblist:
         for cont, match, fname in obj.gather(query, threshold_bp=threshold_bp):
             assert cont                   # all matches should be nonzero.

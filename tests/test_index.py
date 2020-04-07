@@ -215,3 +215,51 @@ def test_linear_index_save_load():
     print([s[1].name() for s in sr])
     assert len(sr) == 1
     assert sr[0][1] == ss2
+
+
+def test_linear_index_multik_select():
+    # this loads three ksizes, 21/31/51
+    sig2 = utils.get_test_data('2.fa.sig')
+    siglist = sourmash.load_signatures(sig2)
+
+    linear = LinearIndex()
+    for ss in siglist:
+        linear.insert(ss)
+
+    # select most specifically
+    linear2 = linear.select(ksize=31, moltype='DNA')
+    assert len(linear2) == 1
+
+    # all are DNA:
+    linear2 = linear.select(moltype='DNA')
+    assert len(linear2) == 3
+
+
+def test_linear_index_moltype_select():
+    # this loads two ksizes(21, 30), and two moltypes (DNA and protein)
+    filename = utils.get_test_data('genome-s10+s11.sig')
+    siglist = sourmash.load_signatures(filename)
+
+    linear = LinearIndex()
+    for ss in siglist:
+        linear.insert(ss)
+
+    # select most specific DNA
+    linear2 = linear.select(ksize=30, moltype='DNA')
+    assert len(linear2) == 1
+
+    # select most specific protein
+    linear2 = linear.select(ksize=30, moltype='protein')
+    assert len(linear2) == 1
+
+    # can leave off ksize, selects all ksizes
+    linear2 = linear.select(moltype='DNA')
+    assert len(linear2) == 2
+
+    # can leave off ksize, selects all ksizes
+    linear2 = linear.select(moltype='protein')
+    assert len(linear2) == 2
+
+    # select something impossible
+    linear2 = linear.select(ksize=4)
+    assert len(linear2) == 0

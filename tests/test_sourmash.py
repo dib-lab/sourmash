@@ -1219,7 +1219,8 @@ def test_search_deduce_ksize_not_unique():
                                            fail_ok=True)
         print(status, out, err)
         assert status == -1
-        assert '2 signatures matching ksize' in err
+        # assert '2 signatures matching ksize' in err
+        assert "couldn't find acceptable query" in err # @CTB improve err msg
 
 
 def test_search_deduce_ksize_vs_user_specified():
@@ -1239,7 +1240,8 @@ def test_search_deduce_ksize_vs_user_specified():
                                            fail_ok=True)
         print(status, out, err)
         assert status == -1
-        assert '0 signatures matching ksize' in err
+        #assert '0 signatures matching ksize' in err
+        assert "Cannot match query signature with args; exiting." in err # @CTB
 
 
 def test_search_containment():
@@ -1251,10 +1253,8 @@ def test_search_containment():
                                            ['compute', testdata1, testdata2],
                                            in_directory=location)
 
-
-
         status, out, err = utils.runscript('sourmash',
-                                           ['search', 'short.fa.sig',
+                                           ['search', 'short.fa.sig', '-k', '31',
                                             'short2.fa.sig', '--containment'],
                                            in_directory=location)
         print(status, out, err)
@@ -1306,7 +1306,7 @@ def test_search_gzip():
             fp.write(data)
 
         status, out, err = utils.runscript('sourmash',
-                                           ['search', 'zzz.gz',
+                                           ['search', '-k', '31', 'zzz.gz',
                                             'yyy.gz'],
                                            in_directory=location)
         print(status, out, err)
@@ -1324,10 +1324,8 @@ def test_search_2():
                                             testdata3],
                                            in_directory=location)
 
-
-
         status, out, err = utils.runscript('sourmash',
-                                           ['search', 'short.fa.sig',
+                                           ['search', 'short.fa.sig', '-k', '31',
                                             'short2.fa.sig', 'short3.fa.sig'],
                                            in_directory=location)
         print(status, out, err)
@@ -1346,10 +1344,8 @@ def test_search_3():
                                             testdata3],
                                            in_directory=location)
 
-
-
         status, out, err = utils.runscript('sourmash',
-                                           ['search', '-n', '1',
+                                           ['search', '-n', '1', '-k', '31',
                                             'short.fa.sig',
                                             'short2.fa.sig', 'short3.fa.sig'],
                                            in_directory=location)
@@ -1370,7 +1366,7 @@ def test_search_4():
 
 
         status, out, err = utils.runscript('sourmash',
-                                           ['search', '-n', '0',
+                                           ['search', '-n', '0', '-k', '31',
                                             'short.fa.sig',
                                             'short2.fa.sig', 'short3.fa.sig'],
                                            in_directory=location)
@@ -1600,8 +1596,12 @@ def test_do_sourmash_sbt_search_wrong_ksize():
                                            in_directory=location,
                                            fail_ok=True)
 
+        print(out)
+        print(err)
+
         assert status == -1
-        assert 'this is different from' in err
+        #assert 'this is different from' in err
+        assert "couldn't match" in err # @CTB fixme improve error message
 
 
 def test_do_sourmash_sbt_search_multiple():
@@ -1761,7 +1761,8 @@ def test_do_sourmash_sbt_search_selectprot():
 
 
 def test_do_sourmash_sbt_search_dnaprotquery():
-    # sbt_search should fail if non-single query sig given
+    # search should succeed if one of multiple queries have a signature
+    # type match match with the subject(s).
     with utils.TempDirectory() as location:
         testdata1 = utils.get_test_data('short.fa')
         testdata2 = utils.get_test_data('short2.fa')
@@ -1780,11 +1781,10 @@ def test_do_sourmash_sbt_search_dnaprotquery():
 
         args = ['search', 'short.fa.sig', 'zzz']
         status, out, err = utils.runscript('sourmash', args,
-                                           in_directory=location, fail_ok=True)
-        assert status != 0
+                                           in_directory=location)
         print(out)
         print(err)
-        assert 'need exactly one' in err
+        assert '2 matches:' in out
 
 
 def test_do_sourmash_index_traverse():
@@ -2505,7 +2505,7 @@ def test_gather_nomatch():
         testdata_query = utils.get_test_data('gather/GCF_000006945.2_ASM694v2_genomic.fna.gz.sig')
         testdata_match = utils.get_test_data('lca/TARA_ASE_MAG_00031.sig')
 
-        cmd = 'gather {} {}'.format(testdata_query, testdata_match)
+        cmd = 'gather -k 31 {} {}'.format(testdata_query, testdata_match)
         status, out, err = utils.runscript('sourmash', cmd.split(' '),
                                            in_directory=location)
 
@@ -2734,7 +2734,7 @@ def test_gather_query_downsample():
         print(out)
         print(err)
 
-        assert 'loaded 12 signatures' in err
+        #@CTB assert 'loaded 12 signatures' in err
         assert all(('4.9 Mbp      100.0%  100.0%' in out,
                 'NC_003197.2' in out))
 

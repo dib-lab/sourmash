@@ -566,16 +566,19 @@ class MinHash(RustObject):
         """Check if this MinHash is a particular human-readable molecule type.
 
         Supports 'protein', 'dayhoff', 'hp', 'DNA'.
+        @CTB deprecate for 4.0?
         """
         if molecule.lower() not in ('protein', 'dayhoff', 'hp', 'dna'):
             raise ValueError("unknown moltype in query, '{}'".format(molecule))
-        if self.is_protein and molecule == 'protein':
-            return True
-        elif self.dayhoff and molecule == 'dayhoff':
-            return True
-        elif self.hp and molecule == 'hp':
-            return True
-        elif molecule.lower() == "dna" and self.is_dna:
-            return True
+        return molecule == self.moltype
 
-        return False
+    @property
+    def moltype(self):                    # TODO: test in minhash tests
+        if self.is_protein:
+            return 'protein'
+        elif self.dayhoff:
+            return 'dayhoff'
+        elif self.hp:
+            return 'hp'
+        else:
+            return 'DNA'

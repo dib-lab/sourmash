@@ -414,12 +414,37 @@ def search(args):
     from .search import search_databases
 
     set_quiet(args.quiet)
-    moltype = sourmash_args.calculate_moltype(args)
 
-    # set up the query.
-    query = sourmash_args.load_query_signature(args.query,
-                                               ksize=args.ksize,
-                                               select_moltype=moltype)
+    # load the command line argument selectors & query signature(s).
+    db_loader = sourmash_args.SearchDBLoader2(require_scaled=True)
+    db_loader.parse_args_selectors(args)
+    if not db_loader.load_query(args.query):
+        error("Cannot load query signature; exiting.")
+        sys.exit(-1)
+    if not db_loader.check_query_against_arg_selectors():
+        error("Cannot match query signature with args; exiting.")
+        sys.exit(-1)
+
+    # load the databases.
+    loaded_db_list = []
+    for filename in args.databases:
+        db, params = sourmash_args.load_target_with_params(filename)
+        if not db:
+            error("couldn't load {}", filename)
+            sys.exit(-1)
+        if not db_loader.add_database(filename, params):
+            error("couldn't match {}", filename)
+            sys.exit(-1)
+
+        loaded_db_list.append((db, filename, 'XYZ'))
+
+    # now that we've loaded the databases, figure out which query (queries?)
+    # are compatible. If there's exactly one, perfect!
+    if not db_loader.decide_query():
+        error("couldn't find acceptable query.")
+        sys.exit(-1)
+
+    query = db_loader.chosen_query
     notify('loaded query: {}... (k={}, {})', query.name()[:30],
                                              query.minhash.ksize,
                                              sourmash_args.get_moltype(query))
@@ -435,14 +460,18 @@ def search(args):
                    query.minhash.scaled, int(args.scaled))
         query.minhash = query.minhash.downsample_scaled(args.scaled)
 
-    # set up the search databases
-    databases = sourmash_args.load_dbs_and_sigs(args.databases, query,
-                                                not args.containment,
-                                                args.traverse_directory)
-
     # forcibly ignore abundances if query has no abundances
     if not query.minhash.track_abundance:
         args.ignore_abundance = True
+
+    # set up the search databases
+    # now that we have the query, apply the same selector to the databaess.
+    databases = []
+    for (db, filename, _) in loaded_db_list:
+        new_db = db.select(ksize=query.minhash.ksize,
+                           moltype=query.minhash.moltype)
+        # @CTB: here is also where we select the scaled.
+        databases.append((new_db, filename, 'XXX'))
 
     if not len(databases):
         error('Nothing found to search!')
@@ -570,17 +599,42 @@ def gather(args):
     from .search import gather_databases, format_bp
 
     set_quiet(args.quiet, args.debug)
-    moltype = sourmash_args.calculate_moltype(args)
 
-    # load the query signature & figure out all the things
-    query = sourmash_args.load_query_signature(args.query,
-                                               ksize=args.ksize,
-                                               select_moltype=moltype)
+    # load the command line argument selectors & query signature(s).
+    db_loader = sourmash_args.SearchDBLoader2(require_scaled=True)
+    db_loader.parse_args_selectors(args)
+    if not db_loader.load_query(args.query):
+        error("Cannot load query signature; exiting.")
+        sys.exit(-1)
+    if not db_loader.check_query_against_arg_selectors():
+        error("Cannot match query signature with args; exiting.")
+        sys.exit(-1)
+
+    # load the databases.
+    loaded_db_list = []
+    for filename in args.databases:
+        db, params = sourmash_args.load_target_with_params(filename)
+        if not db:
+            error("couldn't load {}", filename)
+            sys.exit(-1)
+        if not db_loader.add_database(filename, params):
+            error("couldn't match {}", filename)
+            sys.exit(-1)
+
+        loaded_db_list.append((db, filename, 'XYZ'))
+
+    # now that we've loaded the databases, figure out which query (queries?)
+    # are compatible. If there's exactly one, perfect!
+    if not db_loader.decide_query():
+        error("couldn't find acceptable query.")
+        sys.exit(-1)
+
+    query = db_loader.chosen_query
     notify('loaded query: {}... (k={}, {})', query.name()[:30],
                                              query.minhash.ksize,
                                              sourmash_args.get_moltype(query))
 
-    # verify signature was computed right.
+    # verify signature was computed with --scaled.
     if query.minhash.scaled == 0:
         error('query signature needs to be created with --scaled')
         sys.exit(-1)
@@ -596,13 +650,19 @@ def gather(args):
         error('no query hashes!? exiting.')
         sys.exit(-1)
 
-    # set up the search databases
-    databases = sourmash_args.load_dbs_and_sigs(args.databases, query, False,
-                                                 args.traverse_directory)
+    # now that we have the query, apply the same selector to the databaess.
+    databases = []
+    for (db, filename, _) in loaded_db_list:
+        new_db = db.select(ksize=query.minhash.ksize,
+                           moltype=query.minhash.moltype)
+        # @CTB: here is also where we select the scaled.
+        databases.append((new_db, filename, 'XXX'))
 
     if not len(databases):
         error('Nothing found to search!')
         sys.exit(-1)
+
+    ### execute the gather algorithm.
 
     found = []
     weighted_missed = 1

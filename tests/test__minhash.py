@@ -65,6 +65,8 @@ from . import sourmash_tst_utils as utils
 def test_basic_dna(track_abundance):
     # verify that MHs of size 1 stay size 1, & act properly as bottom sketches.
     mh = MinHash(1, 4, track_abundance=track_abundance)
+    assert mh.moltype == 'DNA'
+
     mh.add_sequence('ATGC')
     a = mh.get_mins()
 
@@ -116,7 +118,14 @@ def test_bytes_dna(track_abundance):
 
 def test_bytes_protein_dayhoff(track_abundance, dayhoff):
     # verify that we can hash protein/aa sequences
-    mh = MinHash(10, 6, True, dayhoff=dayhoff, hp=False, track_abundance=track_abundance)
+    mh = MinHash(10, 6, True, dayhoff=dayhoff, hp=False,
+                 track_abundance=track_abundance)
+
+    expected_moltype = 'protein'
+    if dayhoff:
+        expected_moltype = 'dayhoff'
+    assert mh.moltype == expected_moltype
+
     mh.add_protein('AGYYG')
     mh.add_protein('AGYYG')
     mh.add_protein(b'AGYYG')
@@ -135,6 +144,11 @@ def test_protein_dayhoff(track_abundance, dayhoff):
 def test_bytes_protein_hp(track_abundance, hp):
     # verify that we can hash protein/aa sequences
     mh = MinHash(10, 6, True, dayhoff=False, hp=hp, track_abundance=track_abundance)
+    expected_moltype = 'protein'
+    if hp:
+        expected_moltype = 'hp'
+    assert mh.moltype == expected_moltype
+
     mh.add_protein('AGYYG')
     mh.add_protein(u'AGYYG')
     mh.add_protein(b'AGYYG')
@@ -159,6 +173,8 @@ def test_protein_hp(track_abundance, hp):
 def test_translate_codon(track_abundance):
     # Ensure that translation occurs properly
     mh = MinHash(10, 6, is_protein=True)
+    assert mh.moltype == 'protein'
+
     assert "S" == mh.translate_codon('TCT')
     assert "S" == mh.translate_codon('TC')
     assert "X" == mh.translate_codon("T")
@@ -187,6 +203,8 @@ def test_hp(track_abundance):
     # verify that we can hash to hp-encoded protein/aa sequences
     mh_hp = MinHash(10, 6, is_protein=True,
                     dayhoff=False, hp=True, track_abundance=track_abundance)
+    assert mh_hp.moltype == 'hp'
+
     mh_hp.add_sequence('ACTGAC')
 
     assert len(mh_hp.get_mins()) == 2
@@ -1096,7 +1114,8 @@ def test_set_abundance():
 
 
 def test_set_abundance_2():
-    sig = sourmash.load_one_signature(utils.get_test_data("genome-s12.fa.gz.sig"),
+    datapath = utils.get_test_data("genome-s12.fa.gz.sig")
+    sig = sourmash.load_one_signature(datapath,
                                       ksize=30,
                                       select_moltype='dna')
     new_mh = sig.minhash.copy_and_clear()

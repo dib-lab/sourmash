@@ -199,6 +199,18 @@ class LCA_Database(Index):
         for v in self._signatures.values():
             yield SourmashSignature(v)
 
+    def select(self, ksize=None, moltype=None):
+        ok = True
+        if ksize is not None and self.ksize != ksize:
+            ok = False
+        if moltype is not None and moltype != 'DNA':
+            ok = False
+
+        if ok:
+            return self
+
+        raise ValueError("cannot select LCA on ksize {} / moltype {}".format(ksize, moltype))
+
     def load(self, db_name):
         "Load from a JSON file."
         xopen = open

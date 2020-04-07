@@ -137,6 +137,20 @@ class SBT(Index):
         for k in self.leaves():
             yield k.data
 
+    def select(self, ksize=None, moltype=None):
+        first_sig = next(iter(self.signatures()))
+
+        ok = True
+        if ksize is not None and first_sig.minhash.ksize != ksize:
+            ok = False
+        if moltype is not None and first_sig.minhash.moltype != moltype:
+            ok = False
+
+        if ok:
+            return self
+
+        raise ValueError("cannot select SBT on ksize {} / moltype {}".format(ksize, moltype))
+
     def new_node_pos(self, node):
         if not self._nodes:
             self.next_node = 1
