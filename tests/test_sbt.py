@@ -3,6 +3,7 @@ from __future__ import print_function, unicode_literals
 import json
 import shutil
 import os
+import json
 
 import pytest
 
@@ -629,6 +630,23 @@ def test_save_sparseness(n_children):
             # Leaf nodes can't have children
             if isinstance(node, Leaf):
                 assert all(c.node is None for c in tree_loaded.children(pos))
+
+
+@utils.in_tempdir
+def test_index_same_sig(c):
+    # test that we don't redundantly index the same file twice.
+    sigfile = utils.get_test_data('47.fa.sig')
+    c.run_sourmash('index', 'foo', sigfile, sigfile)
+
+    # load JSON
+    with open(c.output('foo.sbt.json'), 'rt') as fp:
+        xxx = json.load(fp)
+
+    import pprint
+    pprint.pprint(xxx)
+    print(len(xxx['nodes']))
+
+    assert len(xxx['nodes']) == 2
 
 
 def test_sbt_as_index_signatures():

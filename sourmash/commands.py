@@ -358,6 +358,7 @@ def index(args):
     moltypes = set()
     nums = set()
     scaleds = set()
+    md5sums = set()
     for f in inp_files:
         if n % 100 == 0:
             notify('\r...reading from {} ({} signatures so far)', f, n, end='')
@@ -375,7 +376,13 @@ def index(args):
                 ss.minhash = ss.minhash.downsample_scaled(args.scaled)
             scaleds.add(ss.minhash.scaled)
 
+            md5sum = ss.md5sum()
+            if md5sum in md5sums:
+                notify('leaf already exists, failing.')
+                sys.exit(-1)
+
             tree.insert(ss)
+            md5sums.add(md5sum)
             n += 1
 
         if not ss:
