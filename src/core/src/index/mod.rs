@@ -8,7 +8,7 @@ pub mod linear;
 pub mod sbt;
 
 pub mod storage;
-
+pub mod lca_db;
 pub mod search;
 
 use std::ops::Deref;

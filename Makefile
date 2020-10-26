@@ -30,6 +30,7 @@ include/sourmash.h: src/core/src/lib.rs \
                     src/core/src/ffi/minhash.rs \
                     src/core/src/ffi/signature.rs \
                     src/core/src/ffi/nodegraph.rs \
+                    src/core/src/ffi/lca_db.rs \
                     src/core/src/errors.rs
 	cd src/core && \
 	RUSTUP_TOOLCHAIN=nightly cbindgen -c cbindgen.toml . -o ../../$@

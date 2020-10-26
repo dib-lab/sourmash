@@ -10,6 +10,7 @@ pub mod cmd;
 pub mod minhash;
 pub mod nodegraph;
 pub mod signature;
+pub mod lca_db;
 
 use std::ffi::CStr;
 use std::os::raw::c_char;

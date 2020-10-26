@@ -128,10 +128,7 @@ def gather_signature(query_sig, dblist, ignore_abundance):
         assert top_count == len(intersect_mins)
 
         # calculate size of match (# of hashvals belonging to that sig)
-        match_size = 0
-        for hashval, idx_list in best_lca_db.hashval_to_idx.items():
-            if best_idx in idx_list:
-                match_size += 1
+        match_size = best_lca_db._get_match_size(best_idx)
 
         # construct 'result' object
         intersect_bp = top_count * query_sig.minhash.scaled
@@ -141,15 +138,8 @@ def gather_signature(query_sig, dblist, ignore_abundance):
                / len(intersect_mins)
         f_match = len(intersect_mins) / match_size
 
-        # XXX name and lineage
-        for ident, idx in best_lca_db.ident_to_idx.items():
-            if idx == best_idx:
-                name = best_lca_db.ident_to_name[ident]
-
-        lid = best_lca_db.idx_to_lid.get(best_idx)
-        lineage = ()
-        if lid is not None:
-            lineage = best_lca_db.lid_to_lineage[lid]
+        name = best_lca_db._best_name(best_idx)
+        lineage = best_lca_db._get_lineage_from_idx(best_idx)
 
         result = LCAGatherResult(intersect_bp = intersect_bp,
                                  f_unique_to_query= top_count / n_mins,

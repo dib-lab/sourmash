@@ -24,11 +24,10 @@ def make_lca_counts(dblist, min_num=0):
                 continue
 
             for idx in idx_list:
-                lid = lca_db.idx_to_lid.get(idx)
-                if lid is not None:
-                    lineage = lca_db.lid_to_lineage[lid]
+                lineage = lca_db._get_lineage_from_idx(idx)
+                if lineage:
                     assignments[hashval].add(lineage)
-
+    
     # now convert to trees -> do LCA & counts
     counts = defaultdict(int)
     for hashval, lineages in assignments.items():

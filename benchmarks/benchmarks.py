@@ -48,11 +48,11 @@ class TimeMinHashSuite:
         mh = self.mh
         mh.add_many(list(range(1000)))
 
-    def time_compare(self):
-        mh = self.mh
-        other_mh = self.populated_mh
-        for i in range(500):
-            mh.compare(other_mh)
+    # def time_compare(self):
+    #     mh = self.mh
+    #     other_mh = self.populated_mh
+    #     for i in range(500):
+    #         mh.compare(other_mh)
 
     def time_count_common(self):
         mh = self.mh
