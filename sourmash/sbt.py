@@ -56,7 +56,7 @@ from cachetools import Cache
 
 from .exceptions import IndexNotSupported
 from .sbt_storage import FSStorage, IPFSStorage, RedisStorage, ZipStorage
-from .logging import error, notify, debug
+from .logging import error, notify, debug, trace
 from .index import Index
 from .nodegraph import Nodegraph, extract_nodegraph_info, calc_expected_collisions
 
@@ -317,6 +317,7 @@ class SBT(Index):
             if node_p not in visited:
                 visited.add(node_p)
 
+                trace("(TRAVERSAL) {0}", node_p)
                 # apply search fn. If return false, truncate search.
                 if search_fn(node_g, *args):
 
@@ -327,9 +328,10 @@ class SBT(Index):
                     elif isinstance(node_g, Node):
                         if kwargs.get('dfs', True):  # defaults search to dfs
                             for c in self.children(node_p):
-                                queue.insert(0, c.pos)
+                                if c.node:
+                                    queue.insert(0, c.pos)
                         else: # bfs
-                            queue.extend(c.pos for c in self.children(node_p))
+                            queue.extend(c.pos for c in self.children(node_p) if c.node)
 
                 if unload_data:
                     node_g.unload()
@@ -1087,13 +1089,15 @@ class SBT(Index):
         while stack:
             node_p = stack.pop()
             node_g = self._nodes.get(node_p, None)
+            if node_g is None:
+                node_g = self._leaves.get(node_p, None)
             if node_p not in visited and node_g is not None:
                 visited.add(node_p)
                 depth = int(math.floor(math.log(node_p + 1, self.d)))
-                print(" " * 4 * depth, node_g)
+                print(" " * 4 * depth, node_p, node_g)
                 if isinstance(node_g, Node):
-                    stack.extend(c.pos for c in self.children(node_p)
-                                       if c.pos not in visited)
+                    stack.extend(reversed([c.pos for c in self.children(node_p)
+                                           if c.pos not in visited]))
 
     def __iter__(self):
         for i, node in self._nodes.items():

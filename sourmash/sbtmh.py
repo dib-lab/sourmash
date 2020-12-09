@@ -3,6 +3,7 @@ import sys
 
 from .sbt import Leaf, SBT, GraphFactory
 from . import signature
+from .logging import trace
 
 
 def load_sbt_index(filename, *, print_version_warning=True, cache_size=None):
@@ -112,6 +113,8 @@ def search_minhashes(node, sig, threshold, results=None):
     else:  # Node minhash comparison
         score = _max_jaccard_underneath_internal_node(node, sig_mh)
 
+    trace("(SCORE) {0}: {1}", node.name, score)
+
     if results is not None:
         results[node.name] = score
 
@@ -133,6 +136,8 @@ class SearchMinHashesFindBest(object):
             score = node.data.minhash.similarity(sig_mh)
         else:  # internal object, not leaf.
             score = _max_jaccard_underneath_internal_node(node, sig_mh)
+
+        trace("(SCORE) {0}: {1}", node.name, score)
 
         if results is not None:
             results[node.name] = score
@@ -156,10 +161,15 @@ def search_minhashes_containment(node, sig, threshold, results=None, downsample=
     else:  # Node or Leaf, Nodegraph by minhash comparison
         matches = node.data.matches(mh)
 
-    if results is not None:
-        results[node.name] = float(matches) / len(mh)
+    len_mh = max(len(mh), 1)
 
-    if len(mh) and float(matches) / len(mh) >= threshold:
+    score = float(matches) / len_mh
+    trace("(SCORE) {0}: {1}", node.name, score)
+
+    if results is not None:
+        results[node.name] = score
+
+    if len_mh and score >= threshold:
         return 1
     return 0
 
@@ -170,7 +180,9 @@ class GatherMinHashes(object):
 
     def search(self, node, query, threshold, results=None):
         mh = query.minhash
+        score = 0
         if not len(mh):
+            trace("(SCORE) {0}: 0", node.name)
             return 0
 
         if isinstance(node, SigLeaf):
@@ -179,9 +191,11 @@ class GatherMinHashes(object):
             matches = node.data.matches(mh)
 
         if not matches:
+            trace("(SCORE) {0}: 0", node.name)
             return 0
 
         score = float(matches) / len(mh)
+        trace("(SCORE) {0}: {1}", node.name, score)
 
         if score < threshold:
             return 0

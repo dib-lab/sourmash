@@ -1,12 +1,26 @@
+import atexit
+import os
 import sys
 from io import StringIO
 
 _quiet = False
 _debug = False
 def set_quiet(val, print_debug=False):
-    global _quiet, _debug
+    global _quiet, _debug, _trace
     _quiet = bool(val)
     _debug = bool(print_debug)
+
+#_trace = True if "SOURMASH_TRACE" in os.environ else False
+if "SOURMASH_TRACE" in os.environ:
+    _trace = open(os.environ["SOURMASH_TRACE"], "w")
+
+    @atexit.register
+    def flush_and_close():
+        global _trace
+        _trace.flush()
+        _trace.close()
+else:
+    _trace = None
 
 
 def print_results(s, *args, **kwargs):
@@ -36,6 +50,17 @@ def debug(s, *args, **kwargs):
 
     print(u'\r\033[K', end=u'', file=sys.stderr)
     print(s.format(*args, **kwargs), file=sys.stderr,
+          end=kwargs.get('end', u'\n'))
+    if kwargs.get('flush'):
+        sys.stderr.flush()
+
+
+def trace(s, *args, **kwargs):
+    "Low level execution information (even more verbose than debug)"
+    if not _trace:
+        return
+
+    print(s.format(*args, **kwargs), file=_trace,
           end=kwargs.get('end', u'\n'))
     if kwargs.get('flush'):
         sys.stderr.flush()
