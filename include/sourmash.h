@@ -263,6 +263,8 @@ uintptr_t nodegraph_get_kmer(const SourmashNodegraph *ptr, const char *kmer);
 
 const uint64_t *nodegraph_hashsizes(const SourmashNodegraph *ptr, uintptr_t *size);
 
+uintptr_t nodegraph_intersection_count(const SourmashNodegraph *ptr, const SourmashNodegraph *optr);
+
 uintptr_t nodegraph_ksize(const SourmashNodegraph *ptr);
 
 uintptr_t nodegraph_matches(const SourmashNodegraph *ptr, const SourmashKmerMinHash *mh_ptr);

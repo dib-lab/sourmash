@@ -327,10 +327,20 @@ def index(args):
     set_quiet(args.quiet)
     moltype = sourmash_args.calculate_moltype(args)
 
+    batch = False
     if args.append:
         tree = load_sbt_index(args.sbt_name)
     else:
-        tree = create_sbt_index(args.bf_size, n_children=args.n_children)
+        bf_size = args.bf_size
+        if bf_size == 0:
+            bf_size = None
+
+        tree = create_sbt_index(bf_size, n_children=args.n_children)
+        batch = True
+
+        # TODO: set up storage here
+        storage_info = tree._setup_storage(args.sbt_name)
+        tree.storage = storage_info.storage
 
     if args.sparseness < 0 or args.sparseness > 1.0:
         error('sparseness must be in range [0.0, 1.0].')
@@ -375,7 +385,7 @@ def index(args):
                 ss.minhash = ss.minhash.downsample(scaled=args.scaled)
             scaleds.add(ss.minhash.scaled)
 
-            tree.insert(ss)
+            tree.insert(ss, batch=batch)
             n += 1
 
         if not ss:
@@ -398,6 +408,8 @@ def index(args):
             error('nums = {}; scaleds = {}', repr(nums), repr(scaleds))
             sys.exit(-1)
 
+    tree = tree.finish()
+
     notify('')
 
     # did we load any!?
@@ -406,6 +418,10 @@ def index(args):
         sys.exit(-1)
 
     notify('loaded {} sigs; saving SBT under "{}"', n, args.sbt_name)
+    # TODO: if all nodes are already saved (like in the scaffold/batch case)
+    # we can potentially set structure_only=True here. An alternative is to
+    # modify Node.save to verify if the data is already saved or still need to
+    # be saved (dirty flag?)
     tree.save(args.sbt_name, sparseness=args.sparseness)
 
 

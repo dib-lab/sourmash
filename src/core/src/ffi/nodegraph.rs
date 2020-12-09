@@ -150,6 +150,18 @@ pub unsafe extern "C" fn nodegraph_update(
 }
 
 #[no_mangle]
+pub unsafe extern "C" fn nodegraph_intersection_count(
+    ptr: *const SourmashNodegraph,
+    optr: *const SourmashNodegraph,
+) -> usize {
+    let ng = SourmashNodegraph::as_rust(ptr);
+    let ong = SourmashNodegraph::as_rust(optr);
+
+    // FIXME raise an exception properly
+    ng.intersection_count(ong)
+}
+
+#[no_mangle]
 pub unsafe extern "C" fn nodegraph_update_mh(
     ptr: *mut SourmashNodegraph,
     optr: *const SourmashKmerMinHash,

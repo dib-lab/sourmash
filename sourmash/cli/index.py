@@ -55,7 +55,9 @@ def subparser(subparsers):
     )
     subparser.add_argument(
         '-x', '--bf-size', metavar='S', type=float, default=1e5,
-        help='Bloom filter size used for internal nodes'
+        help='Maximum Bloom filter size used for internal nodes. Set to 0 '
+             'to calculate an optimal size given the complexity of the datasets '
+             '(using a HyperLogLog to estimate the number of unique k-mers'
     )
     subparser.add_argument(
         '-f', '--force', action='store_true',

@@ -1,5 +1,7 @@
 # -*- coding: UTF-8 -*-
 
+from collections import namedtuple
+import math
 from struct import pack, unpack
 import sys
 from tempfile import NamedTemporaryFile
@@ -86,6 +88,14 @@ class Nodegraph(RustObject):
 
         return self._methodcall(lib.nodegraph_matches, mh._objptr)
 
+    def intersection_count(self, other):
+        if isinstance(other, Nodegraph):
+            return self._methodcall(lib.nodegraph_intersection_count, other._objptr)
+        else:
+            # FIXME: we could take MinHash and sets here too (or anything that can be
+            # converted to a list of ints...)
+            raise TypeError("Must be a Nodegraph")
+
     def to_khmer_nodegraph(self):
         import khmer
         try:
@@ -159,3 +169,62 @@ def calc_expected_collisions(graph, force=False, max_false_pos=.2):
             raise SystemExit(1)
 
     return fp_all
+
+
+def optimal_size(num_kmers, mem_cap=None, fp_rate=None):
+    """
+    Utility function for estimating optimal nodegraph args.
+
+      - num_kmers: number of unique kmers [required]
+      - mem_cap: the allotted amount of memory [optional, conflicts with f]
+      - fp_rate: the desired false positive rate [optional, conflicts with M]
+    """
+    if all((num_kmers is not None, mem_cap is not None, fp_rate is None)):
+        return estimate_optimal_with_K_and_M(num_kmers, mem_cap)
+    elif all((num_kmers is not None, mem_cap is None, fp_rate is not None)):
+        return estimate_optimal_with_K_and_f(num_kmers, fp_rate)
+    else:
+        raise TypeError("num_kmers and either mem_cap or fp_rate"
+                        " must be defined.")
+
+
+def estimate_optimal_with_K_and_M(num_kmers, mem_cap):
+    """
+    Estimate optimal nodegraph args.
+
+     - num_kmers: number of unique kmer
+     - mem_cap: the allotted amount of memory
+    """
+    n_tables = math.log(2) * (mem_cap / float(num_kmers))
+    int_n_tables = int(n_tables)
+    if int_n_tables == 0:
+        int_n_tables = 1
+    ht_size = int(mem_cap / int_n_tables)
+    mem_cap = ht_size * int_n_tables
+    fp_rate = (1 - math.exp(-num_kmers / float(ht_size))) ** int_n_tables
+    res = namedtuple("result", ["num_htables", "htable_size", "mem_use",
+                                "fp_rate"])
+    return res(int_n_tables, ht_size, mem_cap, fp_rate)
+
+
+def estimate_optimal_with_K_and_f(num_kmers, des_fp_rate):
+    """
+    Estimate optimal memory.
+
+    - num_kmers: the number of unique kmers
+    - des_fp_rate: the desired false positive rate
+    """
+    n_tables = math.log(des_fp_rate, 0.5)
+    int_n_tables = int(n_tables)
+    if int_n_tables == 0:
+        int_n_tables = 1
+
+    ht_size = int(-num_kmers / (
+        math.log(1 - des_fp_rate ** (1 / float(int_n_tables)))))
+    ht_size = max(ht_size, 1)
+    mem_cap = ht_size * int_n_tables
+    fp_rate = (1 - math.exp(-num_kmers / float(ht_size))) ** int_n_tables
+
+    res = namedtuple("result", ["num_htables", "htable_size", "mem_use",
+                                "fp_rate"])
+    return res(int_n_tables, ht_size, mem_cap, fp_rate)

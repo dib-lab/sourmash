@@ -32,7 +32,7 @@ pub fn mle(counts: &[u16], p: usize, q: usize, relerr: f64) -> f64 {
 
     let mut z = 0.;
     for i in num_iter::range_step_inclusive(k_max_prime as i32, k_min_prime as i32, -1) {
-        z = 0.5 * z + counts[i as usize] as f64;
+        z = 0.5 * z + (counts[i as usize] as f64);
     }
 
     // ldexp(x, i) = x * (2 ** i)

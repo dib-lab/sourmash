@@ -72,6 +72,10 @@ class FSStorage(Storage):
                     newpath = "{}_{}".format(path, n)
 
         fullpath = os.path.join(self.location, self.subdir, newpath)
+        dirpath = os.path.dirname(fullpath)
+        if not os.path.exists(dirpath):
+            os.makedirs(dirpath)
+
         with open(fullpath, 'wb') as f:
             f.write(content)
 

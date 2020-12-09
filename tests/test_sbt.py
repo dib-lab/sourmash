@@ -7,7 +7,7 @@ import pytest
 import sourmash
 from sourmash import load_one_signature, SourmashSignature, load_signatures
 from sourmash.exceptions import IndexNotSupported
-from sourmash.sbt import SBT, GraphFactory, Leaf, Node
+from sourmash.sbt import SBT, GraphFactory, Leaf, Node, scaffold
 from sourmash.sbtmh import (SigLeaf, search_minhashes,
                             search_minhashes_containment)
 from sourmash.sbt_storage import (FSStorage, RedisStorage,
@@ -915,3 +915,44 @@ def test_sbt_node_cache():
 
     assert tree._nodescache.currsize == 1
     assert tree._nodescache.currsize == 1
+
+
+def test_sbt_scaffold(tmpdir):
+    factory = GraphFactory(31, 1e5, 4)
+
+    tree = SBT(factory)
+    leaves = []
+
+    for f in utils.SIG_FILES:
+        sig = next(load_signatures(utils.get_test_data(f)))
+        leaf = SigLeaf(os.path.basename(f), sig)
+        tree.add_node(leaf)
+        leaves.append(leaf)
+        to_search = leaf
+
+    print('*' * 60)
+    print("{}:".format(to_search.metadata))
+    old_result = {str(s) for s in tree.find(search_minhashes,
+                                            to_search.data, 0.1)}
+    print(*old_result, sep='\n')
+
+    with ZipStorage(str(tmpdir.join("tree.sbt.zip"))) as storage:
+        tree = scaffold(list(leaves), storage)
+        new_leaves = set(tree.leaves())
+        assert len(new_leaves) == len(leaves)
+        assert new_leaves == set(leaves)
+
+        tree.save(str(tmpdir.join("tree")), storage=storage)
+
+    with ZipStorage(str(tmpdir.join("tree.sbt.zip"))) as storage:
+        tree = SBT.load(str(tmpdir.join("tree")),
+                        leaf_loader=SigLeaf.load,
+                        storage=storage)
+
+        print('*' * 60)
+        print("{}:".format(to_search.metadata))
+        new_result = {str(s) for s in tree.find(search_minhashes,
+                                                to_search.data, 0.1)}
+        print(*new_result, sep='\n')
+
+        assert old_result == new_result

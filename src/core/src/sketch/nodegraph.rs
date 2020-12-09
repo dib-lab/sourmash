@@ -289,31 +289,29 @@ impl Nodegraph {
         self.unique_kmers
     }
 
-    pub fn similarity(&self, other: &Nodegraph) -> f64 {
-        let result: usize = self
-            .bs
+    pub fn intersection_count(&self, other: &Nodegraph) -> usize {
+        self.bs
             .iter()
             .zip(&other.bs)
             .map(|(bs, bs_other)| bs.intersection(bs_other).count())
-            .sum();
+            .sum()
+    }
+
+    pub fn similarity(&self, other: &Nodegraph) -> f64 {
+        let intersection = self.intersection_count(other);
         let size: usize = self
             .bs
             .iter()
             .zip(&other.bs)
             .map(|(bs, bs_other)| bs.union(bs_other).count())
             .sum();
-        result as f64 / size as f64
+        intersection as f64 / size as f64
     }
 
     pub fn containment(&self, other: &Nodegraph) -> f64 {
-        let result: usize = self
-            .bs
-            .iter()
-            .zip(&other.bs)
-            .map(|(bs, bs_other)| bs.intersection(bs_other).count())
-            .sum();
+        let intersection = self.intersection_count(other);
         let size: usize = self.bs.iter().map(|bs| bs.len()).sum();
-        result as f64 / size as f64
+        intersection as f64 / size as f64
     }
 }
 

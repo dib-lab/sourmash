@@ -1,8 +1,10 @@
 from io import BytesIO
+import os
 import sys
 
 from .sbt import Leaf, SBT, GraphFactory
 from . import signature
+from .logging import trace
 
 
 def load_sbt_index(filename, *, print_version_warning=True, cache_size=None):
@@ -14,7 +16,10 @@ def load_sbt_index(filename, *, print_version_warning=True, cache_size=None):
 
 def create_sbt_index(bloom_filter_size=1e5, n_children=2):
     "Create an empty SBT index."
-    factory = GraphFactory(1, bloom_filter_size, 4)
+    if bloom_filter_size == 0:
+        factory = None
+    else:
+        factory = GraphFactory(1, bloom_filter_size, 4)
     tree = SBT(factory, d=n_children)
     return tree
 
@@ -39,14 +44,21 @@ class SigLeaf(Leaf):
         return '**Leaf:{name} -> {metadata}'.format(
                 name=self.name, metadata=self.metadata)
 
-    def save(self, path):
+    def save(self, subdir=None):
         # this is here only for triggering the property load
         # before we reopen the file (and overwrite the previous
         # content...)
         self.data
 
+        path = "signatures/" + self.data.md5sum()
+
+        if subdir is not None:
+            path = os.path.join(subdir, path)
+
         buf = signature.save_signatures([self.data], compression=1)
-        return self.storage.save(path, buf)
+        self._path = self.storage.save(path, buf)
+
+        return self._path
 
     def update(self, parent):
         mh = self.data.minhash
@@ -62,7 +74,7 @@ class SigLeaf(Leaf):
     @property
     def data(self):
         if self._data is None:
-            buf = BytesIO(self.storage.load(self._path))
+            buf = self.storage.load(self._path)
             self._data = signature.load_one_signature(buf)
         return self._data
 
@@ -112,6 +124,8 @@ def search_minhashes(node, sig, threshold, results=None):
     else:  # Node minhash comparison
         score = _max_jaccard_underneath_internal_node(node, sig_mh)
 
+    trace("(SCORE) {0}: {1}", node.name, score)
+
     if results is not None:
         results[node.name] = score
 
@@ -133,6 +147,8 @@ class SearchMinHashesFindBest(object):
             score = node.data.minhash.similarity(sig_mh)
         else:  # internal object, not leaf.
             score = _max_jaccard_underneath_internal_node(node, sig_mh)
+
+        trace("(SCORE) {0}: {1}", node.name, score)
 
         if results is not None:
             results[node.name] = score
@@ -156,10 +172,15 @@ def search_minhashes_containment(node, sig, threshold, results=None, downsample=
     else:  # Node or Leaf, Nodegraph by minhash comparison
         matches = node.data.matches(mh)
 
-    if results is not None:
-        results[node.name] = float(matches) / len(mh)
+    len_mh = max(len(mh), 1)
 
-    if len(mh) and float(matches) / len(mh) >= threshold:
+    score = float(matches) / len_mh
+    trace("(SCORE) {0}: {1}", node.name, score)
+
+    if results is not None:
+        results[node.name] = score
+
+    if len_mh and score >= threshold:
         return 1
     return 0
 
@@ -170,7 +191,9 @@ class GatherMinHashes(object):
 
     def search(self, node, query, threshold, results=None):
         mh = query.minhash
+        score = 0
         if not len(mh):
+            trace("(SCORE) {0}: 0", node.name)
             return 0
 
         if isinstance(node, SigLeaf):
@@ -179,9 +202,11 @@ class GatherMinHashes(object):
             matches = node.data.matches(mh)
 
         if not matches:
+            trace("(SCORE) {0}: 0", node.name)
             return 0
 
         score = float(matches) / len(mh)
+        trace("(SCORE) {0}: {1}", node.name, score)
 
         if score < threshold:
             return 0
