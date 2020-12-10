@@ -42,11 +42,15 @@ def subparser(subparsers):
     )
     subparser.add_argument(
         '--split-identifiers', action='store_true',
-        help='split names in signatures on whitspace and period'
+        help='split names in signatures on whitespace and period'
     )
     subparser.add_argument('-f', '--force', action='store_true')
     subparser.add_argument(
         '--report', help='output a report on anomalies, if any'
+    )
+    subparser.add_argument(
+        '--use-filename-as-identifier', action='store_true',
+        help='use the signature filename as identifier',
     )
     subparser.add_argument(
         '--require-taxonomy', action='store_true',

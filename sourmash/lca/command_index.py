@@ -5,6 +5,7 @@ Build a lowest-common-ancestor database with given taxonomy and genome sigs.
 import sys
 import csv
 from collections import defaultdict
+import os.path
 
 from sourmash import sourmash_args, load_signatures
 from sourmash.sourmash_args import load_file_as_signatures
@@ -213,6 +214,8 @@ def index(args):
                 ident = ident.split(' ')[0]
                 # ...and on period.
                 ident = ident.split('.')[0]
+            elif args.use_filename_as_identifier:
+                ident = os.path.basename(sig.filename)
 
             lineage = assignments.get(ident)
 
