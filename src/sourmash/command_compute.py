@@ -10,7 +10,7 @@ import time
 
 from . import sourmash_args
 from .signature import SourmashSignature, save_signatures
-from .logging import notify, error, set_quiet
+from .logging import notify, error, set_quiet, short_notify
 from .utils import RustObject
 from ._lowlevel import ffi, lib
 
@@ -155,7 +155,7 @@ def _compute_individual(args, signatures_factory):
 
         if not args.output and os.path.exists(sigfile) and not \
             args.force:
-            notify('skipping {} - already done', filename)
+            short_notify('skipping {} - already done', filename)
             continue
 
         if args.singleton:
@@ -176,24 +176,24 @@ def _compute_individual(args, signatures_factory):
             sigs = signatures_factory()
 
             # consume & calculate signatures
-            notify('... reading sequences from {}', filename)
+            short_notify('... reading sequences from {}', filename)
             name = None
             for n, record in enumerate(screed.open(filename)):
                 if n % 10000 == 0:
                     if n:
-                        notify('\r...{} {}', filename, n, end='')
+                        short_notify('\r...{} {}', filename, n, end='')
                     elif args.name_from_first:
                         name = record.name
 
                 add_seq(sigs, record.sequence,
                         args.input_is_protein, args.check_sequence)
 
-            notify('...{} {} sequences', filename, n, end='')
+            short_notify('...{} {} sequences', filename, n, end='')
 
             set_sig_name(sigs, filename, name)
             siglist.extend(sigs)
 
-            notify(f'calculated {len(siglist)} signatures for {n+1} sequences in {filename}')
+            short_notify(f'calculated {len(siglist)} signatures for {n+1} sequences in {filename}')
 
         # if no --output specified, save to individual files w/in for loop
         if not args.output:
