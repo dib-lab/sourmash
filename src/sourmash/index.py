@@ -116,10 +116,12 @@ class Index(ABC):
 
         # actually do search!
         results = []
+        query_mh = query.minhash
         for ss in self.signatures():
-            cont = query.minhash.contained_by(ss.minhash, True)
+            cont = query_mh.contained_by(ss.minhash, True)
             if cont and cont >= threshold:
                 results.append((cont, ss, self.filename))
+                query_mh.remove_many(ss.minhash.hashes)
 
         results.sort(reverse=True, key=lambda x: (x[0], x[1].md5sum()))
 

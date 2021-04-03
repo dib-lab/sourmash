@@ -138,11 +138,9 @@ def test_linear_index_gather():
     assert matches[0][1] == ss2
 
     matches = lidx.gather(ss47)
-    assert len(matches) == 2
+    assert len(matches) == 1
     assert matches[0][0] == 1.0
     assert matches[0][1] == ss47
-    assert round(matches[1][0], 2) == 0.49
-    assert matches[1][1] == ss63
 
 
 def test_linear_index_save():
