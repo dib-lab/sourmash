@@ -49,6 +49,26 @@ class Nodegraph(RustObject):
             # converted to a list of ints...)
             raise TypeError("Must be a Nodegraph or MinHash")
 
+    def containment(self, other):
+        if isinstance(other, Nodegraph):
+            return self._methodcall(lib.nodegraph_containment, other._objptr)
+        elif isinstance(other, MinHash):
+            return self._methodcall(lib.nodegraph_containment_mh, other._objptr)
+        else:
+            # FIXME: we could take sets here too (or anything that can be
+            # converted to a list of ints...)
+            raise TypeError("Must be a Nodegraph or MinHash")
+
+    def similarity(self, other):
+        if isinstance(other, Nodegraph):
+            return self._methodcall(lib.nodegraph_similarity, other._objptr)
+        elif isinstance(other, MinHash):
+            return self._methodcall(lib.nodegraph_similarity_mh, other._objptr)
+        else:
+            # FIXME: we could take sets here too (or anything that can be
+            # converted to a list of ints...)
+            raise TypeError("Must be a Nodegraph or MinHash")
+
     def count(self, h):
         if isinstance(h, str):
             return self._methodcall(lib.nodegraph_count_kmer, to_bytes(h))

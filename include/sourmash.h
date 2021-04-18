@@ -248,6 +248,10 @@ double nodegraph_angular_similarity_upper_bound(const SourmashNodegraph *ptr,
 
 void nodegraph_buffer_free(uint8_t *ptr, uintptr_t insize);
 
+double nodegraph_containment(const SourmashNodegraph *ptr, const SourmashNodegraph *optr);
+
+double nodegraph_containment_mh(const SourmashNodegraph *ptr, const SourmashKmerMinHash *optr);
+
 bool nodegraph_count(SourmashNodegraph *ptr, uint64_t h);
 
 bool nodegraph_count_kmer(SourmashNodegraph *ptr, const char *kmer);
@@ -277,6 +281,10 @@ uintptr_t nodegraph_noccupied(const SourmashNodegraph *ptr);
 uintptr_t nodegraph_ntables(const SourmashNodegraph *ptr);
 
 void nodegraph_save(const SourmashNodegraph *ptr, const char *filename);
+
+double nodegraph_similarity(const SourmashNodegraph *ptr, const SourmashNodegraph *optr);
+
+double nodegraph_similarity_mh(const SourmashNodegraph *ptr, const SourmashKmerMinHash *optr);
 
 const uint8_t *nodegraph_to_buffer(const SourmashNodegraph *ptr,
                                    uint8_t compression,

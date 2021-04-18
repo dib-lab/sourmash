@@ -4,6 +4,7 @@ extern crate criterion;
 use std::fs::File;
 use std::io::{BufWriter, Cursor, Read};
 
+use sourmash::index::Comparable;
 use sourmash::sketch::nodegraph::Nodegraph;
 
 use criterion::Criterion;
@@ -49,5 +50,22 @@ fn save_load(c: &mut Criterion) {
     });
 }
 
-criterion_group!(nodegraph, save_load);
+fn comparable(c: &mut Criterion) {
+    let mut group = c.benchmark_group("nodegraph");
+    group.sample_size(10);
+
+    let f = File::open("../../tests/test-data/.sbt.v3/internal.0").unwrap();
+    let ng = Nodegraph::from_reader(f).unwrap();
+    let ng_2 = ng.clone();
+
+    group.bench_function("comparable containment", |b| {
+        b.iter(|| ng.containment(&ng_2));
+    });
+
+    group.bench_function("comparable similarity", |b| {
+        b.iter(|| ng.similarity(&ng_2));
+    });
+}
+
+criterion_group!(nodegraph, save_load, comparable);
 criterion_main!(nodegraph);
