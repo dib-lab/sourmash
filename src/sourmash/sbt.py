@@ -922,8 +922,6 @@ class SBT(Index):
             error("WARNING: this is an old index version, please run `sourmash migrate` to update it.")
             error("WARNING: proceeding with execution, but it will take longer to finish!")
 
-        tree._fill_min_n_below()
-
         return tree
 
     @classmethod
@@ -1041,32 +1039,6 @@ class SBT(Index):
                               if i not in sbt_nodes and i not in sbt_leaves}
 
         return tree
-
-    def _fill_min_n_below(self):
-        """\
-        Propagate the smallest hash size below each node up the tree from
-        the leaves.
-        """
-        def fill_min_n_below(node, *args, **kwargs):
-            original_min_n_below = node.metadata.get('min_n_below', sys.maxsize)
-            min_n_below = original_min_n_below
-
-            children = kwargs['children']
-            for child in children:
-                if child.node is not None:
-                    if isinstance(child.node, Leaf):
-                        min_n_below = min(len(child.node.data.minhash), min_n_below)
-                    else:
-                        child_n = child.node.metadata.get('min_n_below', sys.maxsize)
-                        min_n_below = min(child_n, min_n_below)
-
-            if min_n_below == 0:
-                min_n_below = 1
-
-            node.metadata['min_n_below'] = min_n_below
-            return original_min_n_below != min_n_below
-
-        self._fill_up(fill_min_n_below)
 
     def _fill_internal(self):
 
@@ -1266,12 +1238,6 @@ class Node(object):
 
     def update(self, parent):
         parent.data.update(self.data)
-        if 'min_n_below' in self.metadata:
-            min_n_below = min(parent.metadata.get('min_n_below', sys.maxsize),
-                              self.metadata.get('min_n_below'))
-            if min_n_below == 0:
-                min_n_below = 1
-            parent.metadata['min_n_below'] = min_n_below
 
 
 class Leaf(object):

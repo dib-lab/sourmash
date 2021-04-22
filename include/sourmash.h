@@ -243,6 +243,9 @@ void kmerminhash_slice_free(uint64_t *ptr, uintptr_t insize);
 
 bool kmerminhash_track_abundance(const SourmashKmerMinHash *ptr);
 
+double nodegraph_angular_similarity_upper_bound(const SourmashNodegraph *ptr,
+                                                const SourmashKmerMinHash *mh_ptr);
+
 void nodegraph_buffer_free(uint8_t *ptr, uintptr_t insize);
 
 bool nodegraph_count(SourmashNodegraph *ptr, uint64_t h);

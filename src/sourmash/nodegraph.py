@@ -86,6 +86,14 @@ class Nodegraph(RustObject):
 
         return self._methodcall(lib.nodegraph_matches, mh._objptr)
 
+    def angular_similarity_upper_bound(self, mh):
+        if not isinstance(mh, MinHash):
+            # FIXME: we could take sets here too (or anything that can be
+            # converted to a list of ints...)
+            raise ValueError("mh must be a MinHash")
+
+        return self._methodcall(lib.nodegraph_angular_similarity_upper_bound, mh._objptr)
+
     def to_khmer_nodegraph(self):
         import khmer
         try:

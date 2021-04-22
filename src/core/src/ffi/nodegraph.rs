@@ -137,6 +137,17 @@ pub unsafe extern "C" fn nodegraph_matches(
     ng.matches(mh)
 }
 
+ffi_fn! {
+unsafe fn nodegraph_angular_similarity_upper_bound(
+    ptr: *const SourmashNodegraph,
+    mh_ptr: *const SourmashKmerMinHash,
+) -> Result<f64> {
+    let ng = SourmashNodegraph::as_rust(ptr);
+    let mh = SourmashKmerMinHash::as_rust(mh_ptr);
+    ng.angular_similarity_upper_bound(mh)
+}
+}
+
 #[no_mangle]
 pub unsafe extern "C" fn nodegraph_update(
     ptr: *mut SourmashNodegraph,

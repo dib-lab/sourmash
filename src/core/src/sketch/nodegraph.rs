@@ -1,3 +1,4 @@
+use std::f64::consts::PI;
 use std::fs::File;
 use std::io;
 use std::path::Path;
@@ -152,6 +153,44 @@ impl Nodegraph {
 
     pub fn matches(&self, mh: &KmerMinHash) -> usize {
         mh.iter_mins().filter(|x| self.get(**x) == 1).count()
+    }
+
+    /// upper-bound estimate of the angular similarity with an abundance MinHash
+    ///
+    /// Note that this is not a *tight* bound: it might overestimate a lot.
+    /// The current goal is guaranteeing it doesn't *underestimate*
+    /// (and, if possible, it doesn't overestimate all the time).
+    pub fn angular_similarity_upper_bound(&self, other: &KmerMinHash) -> Result<f64, Error> {
+        if !other.track_abundance() {
+            // TODO: throw error, we need abundance for this
+            unimplemented!()
+        }
+        let other_abunds = other.to_vec_abunds();
+
+        let mut prod = 0;
+        let mut a_sq = 0_u64;
+        let b_sq: u64 = other_abunds.iter().map(|(_, b)| (b * b)).sum();
+
+        for (hash, abund) in other_abunds {
+            if self.get(hash) == 1 {
+                // TODO: which one overestimate less?
+                a_sq += abund * abund;
+                //a_sq += 1;
+
+                prod += abund * abund;
+            }
+        }
+
+        let norm_a = (a_sq as f64).sqrt();
+        let norm_b = (b_sq as f64).sqrt();
+
+        if norm_a == 0. || norm_b == 0. {
+            return Ok(0.0);
+        }
+        let prod = f64::min(prod as f64 / (norm_a * norm_b), 1.);
+        let distance = 2. * prod.acos() / PI;
+        // Adding some leeway with a small epsilon
+        Ok(1. - distance + 1e-3)
     }
 
     pub fn ntables(&self) -> usize {

@@ -51,13 +51,6 @@ class SigLeaf(Leaf):
     def update(self, parent):
         mh = self.data.minhash
         parent.data.update(mh)
-        min_n_below = parent.metadata.get('min_n_below', sys.maxsize)
-        min_n_below = min(len(mh), min_n_below)
-
-        if min_n_below == 0:
-            min_n_below = 1
-
-        parent.metadata['min_n_below'] = min_n_below
 
     @property
     def data(self):
@@ -73,29 +66,33 @@ class SigLeaf(Leaf):
 
 ### Search functionality.
 
-def _max_jaccard_underneath_internal_node(node, mh):
+def _max_jaccard_underneath_internal_node(node, query):
     """\
     calculate the maximum possibility similarity score below
     this node, based on the number of matches in 'hashes' at this node,
-    divided by the smallest minhash size below this node.
+    divided by the size of the query.
 
     This should yield be an upper bound on the Jaccard similarity
     for any signature below this point.
     """
+    mh = query.minhash
+
     if len(mh) == 0:
         return 0.0
 
-    # count the maximum number of hash matches beneath this node
-    matches = node.data.matches(mh)
+    if mh.track_abundance:
+        # In this case we need to use the upper bound for angular similarity
+        max_score = node.data.angular_similarity_upper_bound(mh)
+    else:
+        # In this case we are working with similarity/containment:
+        # J(A, B) = |A intersection B| / |A union B|
+        # If we use only |A| as denominator, it is the containment
+        # Because |A| <= |A union B|, it is also an upper bound on the max jaccard
 
-    # get the size of the smallest collection of hashes below this point
-    min_n_below = node.metadata.get('min_n_below', -1)
+        # count the maximum number of hash matches beneath this node
+        matches = node.data.matches(mh)
 
-    if min_n_below == -1:
-        raise Exception('cannot do similarity search on this SBT; need to rebuild.')
-
-    # max of numerator divided by min of denominator => max Jaccard
-    max_score = float(matches) / min_n_below
+        max_score = float(matches) / len(mh)
 
     return max_score
 
@@ -106,13 +103,12 @@ def search_minhashes(node, sig, threshold, results=None):
     """
     assert results is None
 
-    sig_mh = sig.minhash
     score = 0
 
     if isinstance(node, SigLeaf):
-        score = node.data.minhash.similarity(sig_mh)
+        score = node.data.minhash.similarity(sig.minhash)
     else:  # Node minhash comparison
-        score = _max_jaccard_underneath_internal_node(node, sig_mh)
+        score = _max_jaccard_underneath_internal_node(node, sig)
 
     if score >= threshold:
         return 1
@@ -126,13 +122,12 @@ class SearchMinHashesFindBest(object):
 
     def search(self, node, sig, threshold, results=None):
         assert results is None
-        sig_mh = sig.minhash
         score = 0
 
         if isinstance(node, SigLeaf):
-            score = node.data.minhash.similarity(sig_mh)
+            score = node.data.minhash.similarity(sig.minhash)
         else:  # internal object, not leaf.
-            score = _max_jaccard_underneath_internal_node(node, sig_mh)
+            score = _max_jaccard_underneath_internal_node(node, sig)
 
         if score >= threshold:
             # have we done better than this elsewhere? if yes, truncate.
