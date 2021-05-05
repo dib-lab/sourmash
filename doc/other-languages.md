@@ -32,8 +32,8 @@ sourmash_comp_matrix <- as.matrix(sourmash_comp_matrix)
 
 ```
 
-[See the output of plotting and clustering this matrix](./_static/ecoli-cmp.html),
-produced by [this RMarkdown file](_static/ecoli-cmp.Rmd).
+[See the output of plotting and clustering this matrix](doc/_static/ecoli-cmp.html),
+produced by [this RMarkdown file](doc/_static/ecoli-cmp.Rmd).
 
-You can download the `ecoli.cmp.csv` file itself [here](_static/ecoli.cmp.csv).
+You can download the `ecoli.cmp.csv` file itself [here](doc/_static/ecoli.cmp.csv).
 
