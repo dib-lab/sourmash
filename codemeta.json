@@ -1,17 +1,119 @@
 {
-  "@context": "https://raw.githubusercontent.com/mbjones/codemeta/master/codemeta.jsonld",
-  "@type": "Code",
-  "author": [
-
-  ],
-  "identifier": "",
+  "@context": "https://doi.org/10.5063/schema/codemeta-2.0",
+  "@type": "SoftwareSourceCode",
+  "license": "https://spdx.org/licenses/BSD-3-Clause",
   "codeRepository": "https://github.com/dib-lab/sourmash",
-  "datePublished": "2016-06-07",
-  "dateModified": "2016-06-07",
+  "contIntegration": "https://travis-ci.com/dib-lab/sourmash",
   "dateCreated": "2016-06-07",
-  "description": "Generate, compare, and manipulate MinHash sketches of genomic data",
-  "keywords": "MinHash, k-mers, Python",
-  "license": "BSD 3-clause",
-  "title": "sourmash",
-  "version": "v1.0.0"
+  "datePublished": "2016-06-07",
+  "dateModified": "2020-01-04",
+  "issueTracker": "https://github.com/dib-lab/sourmash/issues",
+  "name": "sourmash: a library for MinHash sketching of DNA",
+  "version": "3.0.1",
+  "identifier": "https://doi.org/10.21105/joss.00027",
+  "applicationCategory": "Bioinformatics",
+  "developmentStatus": "active",
+  "referencePublication": "https://doi.org/10.21105/joss.00027",
+  "programmingLanguage": [
+    "Python",
+    "Rust"
+  ],
+  "relatedLink": [
+    "https://sourmash.readthedocs.io/",
+    "https://sourmash.bio"
+  ],
+  "author": [
+    {
+      "@type": "Person",
+      "@id": "https://orcid.org/0000-0001-6001-2677",
+      "givenName": "C. Titus",
+      "familyName": "Brown"
+    },
+    {
+      "@type": "Person",
+      "@id": "https://orcid.org/0000-0003-4371-9659",
+      "givenName": "Luiz Carlos",
+      "familyName": "Irber Junior"
+    }
+  ],
+  "contributor": [
+    {
+      "@type": "Person",
+      "@id": "https://orcid.org/0000-0002-7388-421X",
+      "givenName": "Taylor",
+      "familyName": "Reiter"
+    },
+    {
+      "@type": "Person",
+      "@id": "https://orcid.org/0000-0002-2942-5331",
+      "givenName": "N. Tessa",
+      "familyName": "Pierce"
+    },
+    {
+      "@type": "Person",
+      "@id": "https://orcid.org/0000-0003-3987-244X",
+      "givenName": "Phillip",
+      "familyName": "Brooks"
+    },
+    {
+      "@type": "Person",
+      "@id": "https://orcid.org/0000-0001-5135-5758",
+      "givenName": "Katrin",
+      "familyName": "Leinweber"
+    },
+    {
+      "@type": "Person",
+      "@id": "https://orcid.org/0000-0003-0931-3698",
+      "givenName": "Tim",
+      "familyName": "Head"
+    },
+    {
+      "@type": "Person",
+      "@id": "https://orcid.org/0000-0003-1320-4873",
+      "givenName": "Connor",
+      "familyName": "Skennerton"
+    },
+    {
+      "@type": "Person",
+      "@id": "https://orcid.org/0000-0003-4412-7970",
+      "givenName": "Olga",
+      "familyName": "Botvinnik"
+    },
+    {
+      "@type": "Person",
+      "@id": "https://orcid.org/0000-0003-1308-8008",
+      "givenName": "Harriet",
+      "familyName": "Alexander"
+    },
+    {
+      "@type": "Person",
+      "@id": "https://orcid.org/0000-0003-0342-8531",
+      "givenName": "Daniel S.",
+      "familyName": "Standage"
+    },
+    {
+      "@type": "Person",
+      "@id": "https://orcid.org/0000-0002-3600-7218",
+      "givenName": "Lisa K.",
+      "familyName": "Johnson"
+    },
+    {
+      "@type": "Person",
+      "@id": "https://orcid.org/0000-0002-5748-9594",
+      "givenName": "Venkata Naga",
+      "familyName": "Pranathi Vemuri"
+    },
+    {
+      "@type": "Person",
+      "@id": "https://orcid.org/0000-0001-8822-8779",
+      "givenName": "Camille",
+      "familyName": "Scott"
+    },
+    {
+      "@type": "Person",
+      "@id": "https://orcid.org/0000-0003-1313-7076",
+      "givenName": "Ricky",
+      "familyName": "Lim"
+    }
+  ]
 }

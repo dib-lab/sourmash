@@ -17,3 +17,21 @@ jobs:
       - name: Trigger new archival in software heritage on new tags
         if: startsWith(github.ref, 'refs/tags/')
         run: curl https://archive.softwareheritage.org/api/1/origin/save/git/url/https://github.com/dib-lab/sourmash.git/
+
+  codemeta:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v1
+
+      - name: set up miniconda
+        uses: goanpeca/setup-miniconda@v1
+        with:
+          activate-environment: metadata-env
+          environment-file: .github/setup-miniconda/metadata_env.yml
+          auto-activate-base: false
+
+      - name: run codemeta-validate
+        shell: bash -l {0}
+        run: |
+           R -e "ifelse(codemetar::codemeta_validate('codemeta.json'), quit(status = 0), quit(status = 1))"

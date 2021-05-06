@@ -18,11 +18,15 @@ specifically.
 We have [several tutorials](tutorials.md) available! Start with
 [Making signatures, comparing, and searching](tutorial-basic.md).
 
-The paper [Large-scale sequence comparisons with sourmash (Pierce et al., 2019)](https://f1000research.com/articles/8-1006)
-gives an overview of how sourmash works and what its major use cases are.
-Please also see the `mash` [software](http://mash.readthedocs.io/en/latest/) and
-[paper (Ondov et al., 2016)](http://dx.doi.org/10.1186/s13059-016-0997-x) for
-background information on how and why MinHash works.
+The sourmash software can be cited as
+[Brown & Irber, 2019](https://doi.org/10.12688/f1000research.19675.1). The
+paper
+[Large-scale sequence comparisons with sourmash (Pierce et al., 2019)](https://doi.org/10.12688/f1000research.19675.1)
+gives an overview of how sourmash works and what its major use cases
+are.  Please also see the `mash`
+[software](http://mash.readthedocs.io/en/latest/) and
+[paper (Ondov et al., 2016)](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-016-0997-x)
+for background information on how and why MinHash works.
 
 **Questions? Thoughts?** Ask us on the [sourmash issue tracker](https://github.com/dib-lab/sourmash/issues/)!
 
@@ -35,7 +39,23 @@ has a number of incompatibilites with v2 and v3. Please see
 To use sourmash, you must be comfortable with the UNIX command line;
 programmers may find the [Python library and API](api.md) useful as well.
 
-If you use sourmash, please cite us!
+If you use sourmash, please cite us! In the body of the paper, we request
+that you cite the F1000Research paper on use cases:
+
+>"We used sourmash to do x, y and z. (Pierce et al., 2019).
+
+and in the Methods, we suggest citing the specfic version of the software,
+together with a reference to the JOSS software paper:
+
+>"We used sourmash vA.B.C (Brown and Irber, 2016).
+
+The full citations are:
+
+>Pierce NT, Irber L, Reiter T et al. Large-scale sequence comparisons
+>with sourmash [version 1; peer review: 2 approved]. F1000Research
+>2019, 8:1006 (https://doi.org/10.12688/f1000research.19675.1)
+
+and
 
 > Brown and Irber (2016),
 > **sourmash: a library for MinHash sketching of DNA**.

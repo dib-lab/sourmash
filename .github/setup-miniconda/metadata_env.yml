@@ -1,0 +1,8 @@
+name: metadata-env
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - r-codemetar
+  - r-jsonld
