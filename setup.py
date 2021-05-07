@@ -8,7 +8,10 @@ DEBUG_BUILD = os.environ.get("SOURMASH_DEBUG") == "1"
 
 
 def build_native(spec):
-    cmd = ["cargo", "build", "--manifest-path", "src/core/Cargo.toml", "--lib"]
+    cmd = ["cargo", "build",
+           "--manifest-path", "src/core/Cargo.toml",
+           "--features", "experimental,parallel",
+           "--lib"]
 
     target = "debug"
     if not DEBUG_BUILD:

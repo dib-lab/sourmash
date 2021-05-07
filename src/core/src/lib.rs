@@ -22,9 +22,12 @@
 pub mod errors;
 pub use errors::SourmashError as Error;
 
+pub mod traits;
+
 pub mod cmd;
 
 pub mod index;
+pub mod storage;
 
 pub mod signature;
 pub mod sketch;

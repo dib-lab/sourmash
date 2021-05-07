@@ -314,3 +314,7 @@ pub unsafe extern "C" fn sourmash_str_free(s: *mut SourmashStr) {
         (*s).free()
     }
 }
+
+impl ForeignObject for SourmashStr {
+    type RustObject = SourmashStr;
+}

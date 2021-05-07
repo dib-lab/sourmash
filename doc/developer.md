@@ -273,6 +273,13 @@ Some installation issues can be solved by simply removing the intermediate build
 make clean
 ```
 
+## Notes on implementing a new `Index`
+
+- required method: `signatures`
+- after that (if there are more efficient impls):
+  * `find`
+  * `search`/`gather`
+
 ## Contents
 
 ```{toctree}

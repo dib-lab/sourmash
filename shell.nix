@@ -15,6 +15,9 @@ in
       (python37.withPackages(ps: with ps; [ virtualenv setuptools ]))
       wasmtime
       wasm-pack
+      cargo-watch
+      cargo-limit
+      rust-cbindgen
     ];
 
     shellHook = ''

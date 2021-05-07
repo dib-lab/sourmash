@@ -16,7 +16,6 @@ use std::fs::File;
 use std::hash::BuildHasherDefault;
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
 
 use log::info;
 use nohash_hasher::NoHashHasher;
@@ -24,14 +23,12 @@ use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
-use crate::index::storage::{FSStorage, ReadData, Storage, StorageInfo, ToWriter};
 use crate::index::{Comparable, DatasetInfo, Index, SigStore};
 use crate::signature::Signature;
+use crate::storage::{FSStorage, InnerStorage, ReadData, Storage, StorageInfo};
 use crate::Error;
 
-pub trait Update<O> {
-    fn update(&self, other: &mut O) -> Result<(), Error>;
-}
+use crate::traits::{ToWriter, Update};
 
 pub trait FromFactory<N> {
     fn factory(&self, name: &str) -> Result<N, Error>;
@@ -43,7 +40,7 @@ pub struct SBT<N, L> {
     d: u32,
 
     #[builder(default, setter(into))]
-    storage: Option<Rc<dyn Storage>>,
+    storage: Option<InnerStorage>,
 
     #[builder(default = Factory::GraphFactory { args: (1, 100000.0, 4) })]
     factory: Factory,
@@ -87,7 +84,7 @@ where
         (0..u64::from(self.d)).map(|c| self.child(pos, c)).collect()
     }
 
-    pub fn storage(&self) -> Option<Rc<dyn Storage>> {
+    pub fn storage(&self) -> Option<InnerStorage> {
         self.storage.clone()
     }
 
@@ -156,7 +153,7 @@ where
             SBTInfo::V6(ref sbt) => (&sbt.storage.args).into(),
         };
         st.set_base(path.as_ref().to_str().unwrap());
-        let storage: Rc<dyn Storage> = Rc::new(st);
+        let storage = InnerStorage::new(st);
 
         let d = match sinfo {
             SBTInfo::V4(ref sbt) => sbt.d,
@@ -182,7 +179,7 @@ where
                                 .filename(l.filename)
                                 .name(l.name)
                                 .metadata(l.metadata)
-                                .storage(Some(Rc::clone(&storage)))
+                                .storage(Some(storage.clone()))
                                 .build(),
                         )
                     })
@@ -197,7 +194,7 @@ where
                                 .filename(l.filename)
                                 .name(l.name)
                                 .metadata(l.metadata)
-                                .storage(Some(Rc::clone(&storage)))
+                                .storage(Some(storage.clone()))
                                 .build(),
                         )
                     })
@@ -215,7 +212,7 @@ where
                                 .filename(l.filename)
                                 .name(l.name)
                                 .metadata(l.metadata)
-                                .storage(Some(Rc::clone(&storage)))
+                                .storage(Some(storage.clone()))
                                 .build(),
                         )
                     })
@@ -230,7 +227,7 @@ where
                                 .filename(l.filename)
                                 .name(l.name)
                                 .metadata(l.metadata)
-                                .storage(Some(Rc::clone(&storage)))
+                                .storage(Some(storage.clone()))
                                 .build(),
                         )
                     })
@@ -248,7 +245,7 @@ where
                                 .filename(l.filename.clone())
                                 .name(l.name.clone())
                                 .metadata(l.metadata.clone())
-                                .storage(Some(Rc::clone(&storage)))
+                                .storage(Some(storage.clone()))
                                 .build(),
                         )),
                         NodeInfoV4::Leaf(_) => None,
@@ -266,7 +263,7 @@ where
                                 .filename(l.filename)
                                 .name(l.name)
                                 .metadata(l.metadata)
-                                .storage(Some(Rc::clone(&storage)))
+                                .storage(Some(storage.clone()))
                                 .build(),
                         )),
                     })
@@ -279,7 +276,7 @@ where
         Ok(SBT {
             d,
             factory,
-            storage: Some(Rc::clone(&storage)),
+            storage: Some(storage),
             nodes,
             leaves,
         })
@@ -303,7 +300,7 @@ where
     pub fn save_file<P: AsRef<Path>>(
         &mut self,
         path: P,
-        storage: Option<Rc<dyn Storage>>,
+        storage: Option<InnerStorage>,
     ) -> Result<(), Error> {
         let ref_path = path.as_ref();
         let mut basename = ref_path.file_name().unwrap().to_str().unwrap().to_owned();
@@ -316,7 +313,7 @@ where
             Some(s) => s,
             None => {
                 let subdir = format!(".sbt.{}", basename);
-                Rc::new(FSStorage::new(location.to_str().unwrap(), &subdir))
+                InnerStorage::new(FSStorage::new(location.to_str().unwrap(), &subdir))
             }
         };
 
@@ -339,7 +336,7 @@ where
                     let _: &U = (*l).data().expect("Couldn't load data");
 
                     // set storage to new one
-                    l.storage = Some(Rc::clone(&storage));
+                    l.storage = Some(storage.clone());
 
                     let filename = (*l).save(&l.filename).unwrap();
                     let new_node = NodeInfo {
@@ -358,7 +355,7 @@ where
                     let _: &T = (*l).data().unwrap();
 
                     // set storage to new one
-                    l.storage = Some(Rc::clone(&storage));
+                    l.storage = Some(storage.clone());
 
                     // TODO: this should be l.md5sum(), not l.filename
                     let filename = (*l).save(&l.filename).unwrap();
@@ -566,7 +563,7 @@ pub struct Node<T> {
     metadata: HashMap<String, u64>,
 
     #[builder(default)]
-    storage: Option<Rc<dyn Storage>>,
+    storage: Option<InnerStorage>,
 
     #[builder(setter(into), default)]
     data: OnceCell<T>,
@@ -704,7 +701,7 @@ struct TreeNode<T> {
 
 pub fn scaffold<N>(
     mut datasets: Vec<SigStore<Signature>>,
-    storage: Option<Rc<dyn Storage>>,
+    storage: Option<InnerStorage>,
 ) -> SBT<Node<N>, Signature>
 where
     N: Clone + Default,

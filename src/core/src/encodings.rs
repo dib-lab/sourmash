@@ -1,13 +1,22 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::hash::{BuildHasher, BuildHasherDefault, Hash, Hasher};
 use std::iter::Iterator;
 use std::str;
 
+use nohash_hasher::BuildNoHashHasher;
 use once_cell::sync::Lazy;
+
 #[cfg(all(target_arch = "wasm32", target_vendor = "unknown"))]
 use wasm_bindgen::prelude::*;
 
 use crate::Error;
+
+pub type Color = u64;
+pub type Idx = u64;
+type IdxTracker = (vec_collections::VecSet<[Idx; 4]>, u64);
+type ColorToIdx = HashMap<Color, IdxTracker, BuildNoHashHasher<Color>>;
 
 #[cfg_attr(all(target_arch = "wasm32", target_vendor = "unknown"), wasm_bindgen)]
 #[allow(non_camel_case_types)]
@@ -356,3 +365,202 @@ pub const VALID: [bool; 256] = {
     lookup[b'T' as usize] = true;
     lookup
 };
+
+#[derive(Serialize, Deserialize, Default)]
+pub struct Colors {
+    colors: ColorToIdx,
+}
+
+impl Colors {
+    pub fn new() -> Colors {
+        Default::default()
+    }
+
+    /// Given a color and a new idx, return an updated color
+    ///
+    /// This might create a new one, or find an already existing color
+    /// that contains the new_idx
+    ///
+    /// Future optimization: store a count for each color, so we can track
+    /// if there are extra colors that can be removed at the end.
+    /// (the count is decreased whenever a new color has to be created)
+    pub fn update<'a, I: IntoIterator<Item = &'a Idx>>(
+        &mut self,
+        current_color: Option<Color>,
+        new_idxs: I,
+    ) -> Result<Color, Error> {
+        if let Some(color) = current_color {
+            if let Some(idxs) = self.colors.get_mut(&color) {
+                let idx_to_add: Vec<_> = new_idxs
+                    .into_iter()
+                    .filter(|new_idx| !idxs.0.contains(&new_idx))
+                    .collect();
+
+                if idx_to_add.is_empty() {
+                    // Easy case, it already has all the new_idxs, so just return this color
+                    idxs.1 += 1;
+                    Ok(color)
+                } else {
+                    // We need to either create a new color,
+                    // or find an existing color that have the same idxs
+
+                    let mut idxs = idxs.clone();
+                    idxs.0.extend(idx_to_add.into_iter().cloned());
+                    let new_color = Colors::compute_color(&idxs);
+
+                    if new_color != color {
+                        self.colors.get_mut(&color).unwrap().1 -= 1;
+                        if self.colors[&color].1 == 0 {
+                            self.colors.remove(&color);
+                        };
+                    };
+
+                    self.colors
+                        .entry(new_color)
+                        .and_modify(|old_idxs| {
+                            assert_eq!(old_idxs.0, idxs.0);
+                            old_idxs.1 += 1;
+                        })
+                        .or_insert_with(|| (idxs.0, 1));
+                    Ok(new_color)
+                }
+            } else {
+                unimplemented!("throw error, current_color must exist in order to be updated. current_color: {:?}, colors: {:#?}", current_color, &self.colors);
+            }
+        } else {
+            let mut idxs = IdxTracker::default();
+            idxs.0.extend(new_idxs.into_iter().cloned());
+            idxs.1 = 1;
+            let new_color = Colors::compute_color(&idxs);
+            self.colors
+                .entry(new_color)
+                .and_modify(|old_idxs| {
+                    assert_eq!(old_idxs.0, idxs.0);
+                    old_idxs.1 += 1;
+                })
+                .or_insert_with(|| (idxs.0, 1));
+            Ok(new_color)
+        }
+    }
+
+    fn compute_color(idxs: &IdxTracker) -> Color {
+        let s = BuildHasherDefault::<twox_hash::Xxh3Hash128>::default();
+        let mut hasher = s.build_hasher();
+        idxs.0.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    pub fn len(&self) -> usize {
+        self.colors.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.colors.is_empty()
+    }
+
+    pub fn contains(&self, color: Color, idx: Idx) -> bool {
+        if let Some(idxs) = self.colors.get(&color) {
+            idxs.0.contains(&idx)
+        } else {
+            false
+        }
+    }
+
+    pub fn indices(&self, color: &Color) -> Indices {
+        // TODO: what if color is not present?
+        Indices {
+            iter: self.colors.get(&color).unwrap().0.iter(),
+        }
+    }
+
+    pub fn retain<F>(&mut self, f: F)
+    where
+        F: FnMut(&Color, &mut IdxTracker) -> bool,
+    {
+        self.colors.retain(f)
+    }
+}
+
+pub struct Indices<'a> {
+    iter: vec_collections::VecSetIter<core::slice::Iter<'a, Idx>>,
+}
+
+impl<'a> Iterator for Indices<'a> {
+    type Item = &'a Idx;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn colors_update() {
+        let mut colors = Colors::new();
+
+        let color = colors.update(None, &[1_u64]).unwrap();
+        assert_eq!(colors.len(), 1);
+
+        dbg!("update");
+        let new_color = colors.update(Some(color), &[1_u64]).unwrap();
+        assert_eq!(colors.len(), 1);
+        assert_eq!(color, new_color);
+
+        dbg!("upgrade");
+        let new_color = colors.update(Some(color), &[2_u64]).unwrap();
+        assert_eq!(colors.len(), 2);
+        assert_ne!(color, new_color);
+    }
+
+    #[test]
+    fn colors_retain() {
+        let mut colors = Colors::new();
+
+        let color1 = colors.update(None, &[1_u64]).unwrap();
+        assert_eq!(colors.len(), 1);
+        // used_colors:
+        //   color1: 1
+
+        dbg!("update");
+        let same_color = colors.update(Some(color1), &[1_u64]).unwrap();
+        assert_eq!(colors.len(), 1);
+        assert_eq!(color1, same_color);
+        // used_colors:
+        //   color1: 2
+
+        dbg!("upgrade");
+        let color2 = colors.update(Some(color1), &[2_u64]).unwrap();
+        assert_eq!(colors.len(), 2);
+        assert_ne!(color1, color2);
+        // used_colors:
+        //   color1: 1
+        //   color2: 1
+
+        dbg!("update");
+        let same_color = colors.update(Some(color2), &[2_u64]).unwrap();
+        assert_eq!(colors.len(), 2);
+        assert_eq!(color2, same_color);
+        // used_colors:
+        //   color1: 1
+        //   color1: 2
+
+        dbg!("upgrade");
+        let color3 = colors.update(Some(color1), &[3_u64]).unwrap();
+        assert_ne!(color1, color3);
+        assert_ne!(color2, color3);
+        // used_colors:
+        //   color1: 0
+        //   color2: 2
+        //   color3: 1
+
+        // This is the pre color-count tracker, where it is needed
+        // to call retain to maintain colors
+        //assert_eq!(colors.len(), 3);
+        //colors.retain(|c, _| [color2, color3].contains(c));
+
+        assert_eq!(colors.len(), 2);
+    }
+}

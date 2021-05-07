@@ -52,6 +52,10 @@ typedef struct SourmashKmerMinHash SourmashKmerMinHash;
 
 typedef struct SourmashNodegraph SourmashNodegraph;
 
+typedef struct SourmashRevIndex SourmashRevIndex;
+
+typedef struct SourmashSearchResult SourmashSearchResult;
+
 typedef struct SourmashSignature SourmashSignature;
 
 /**
@@ -291,6 +295,49 @@ void nodegraph_update_mh(SourmashNodegraph *ptr, const SourmashKmerMinHash *optr
 SourmashNodegraph *nodegraph_with_tables(uintptr_t ksize,
                                          uintptr_t starting_size,
                                          uintptr_t n_tables);
+
+void revindex_free(SourmashRevIndex *ptr);
+
+const SourmashSearchResult *const *revindex_gather(const SourmashRevIndex *ptr,
+                                                   const SourmashSignature *sig_ptr,
+                                                   double threshold,
+                                                   bool _do_containment,
+                                                   bool _ignore_abundance,
+                                                   uintptr_t *size);
+
+SourmashRevIndex *revindex_new_with_paths(const SourmashStr *const *search_sigs_ptr,
+                                          uintptr_t insigs,
+                                          const SourmashKmerMinHash *template_ptr,
+                                          uintptr_t threshold,
+                                          const SourmashKmerMinHash *const *queries_ptr,
+                                          uintptr_t inqueries,
+                                          bool keep_sigs);
+
+SourmashRevIndex *revindex_new_with_sigs(const SourmashSignature *const *search_sigs_ptr,
+                                         uintptr_t insigs,
+                                         const SourmashKmerMinHash *template_ptr,
+                                         uintptr_t threshold,
+                                         const SourmashKmerMinHash *const *queries_ptr,
+                                         uintptr_t inqueries);
+
+uint64_t revindex_scaled(const SourmashRevIndex *ptr);
+
+const SourmashSearchResult *const *revindex_search(const SourmashRevIndex *ptr,
+                                                   const SourmashSignature *sig_ptr,
+                                                   double threshold,
+                                                   bool do_containment,
+                                                   bool _ignore_abundance,
+                                                   uintptr_t *size);
+
+SourmashSignature **revindex_signatures(const SourmashRevIndex *ptr, uintptr_t *size);
+
+SourmashStr searchresult_filename(const SourmashSearchResult *ptr);
+
+void searchresult_free(SourmashSearchResult *ptr);
+
+double searchresult_score(const SourmashSearchResult *ptr);
+
+SourmashSignature *searchresult_signature(const SourmashSearchResult *ptr);
 
 void signature_add_protein(SourmashSignature *ptr, const char *sequence);
 

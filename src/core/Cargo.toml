@@ -20,6 +20,7 @@ bench = false
 [features]
 from-finch = ["finch"]
 parallel = ["rayon"]
+experimental = []
 
 [dependencies]
 az = "1.0.0"
@@ -27,6 +28,7 @@ backtrace = "0.3.56"
 bytecount = "0.6.0"
 byteorder = "1.4.3"
 cfg-if = "1.0"
+counter = "0.5.2"
 finch = { version = "0.4.1", optional = true }
 fixedbitset = "0.4.0"
 getset = "0.1.1"
@@ -43,6 +45,8 @@ serde_json = "1.0.53"
 primal-check = "0.3.1"
 thiserror = "1.0"
 typed-builder = "0.9.0"
+twox-hash = "1.6.0"
+vec-collections = "0.3.4"
 
 [target.'cfg(all(target_arch = "wasm32", target_vendor="unknown"))'.dependencies.wasm-bindgen]
 version = "0.2.62"

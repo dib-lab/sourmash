@@ -52,7 +52,7 @@ def decode_str(s):
 def encode_str(s):
     """Encodes a SourmashStr"""
     rv = ffi.new("SourmashStr *")
-    if isinstance(s, text_type):
+    if isinstance(s, str):
         s = s.encode("utf-8")
     rv.data = ffi.from_buffer(s)
     rv.len = len(s)

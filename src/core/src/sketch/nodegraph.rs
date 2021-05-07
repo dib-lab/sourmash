@@ -6,8 +6,8 @@ use std::slice;
 use byteorder::{BigEndian, ByteOrder, LittleEndian, ReadBytesExt, WriteBytesExt};
 use fixedbitset::FixedBitSet;
 
-use crate::index::sbt::Update;
 use crate::sketch::minhash::KmerMinHash;
+use crate::traits::Update;
 use crate::Error;
 use crate::HashIntoType;
 

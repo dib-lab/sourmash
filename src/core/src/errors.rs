@@ -43,10 +43,10 @@ pub enum SourmashError {
     HLLPrecisionBounds,
 
     #[error(transparent)]
-    ReadDataError(#[from] crate::index::storage::ReadDataError),
+    ReadDataError(#[from] crate::storage::ReadDataError),
 
     #[error(transparent)]
-    StorageError(#[from] crate::index::storage::StorageError),
+    StorageError(#[from] crate::storage::StorageError),
 
     #[error(transparent)]
     SerdeError(#[from] serde_json::error::Error),

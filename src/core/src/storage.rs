@@ -1,12 +1,34 @@
 use std::fs::{DirBuilder, File};
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use typed_builder::TypedBuilder;
 
 use crate::Error;
+
+#[derive(Clone)]
+pub struct InnerStorage(Arc<Mutex<dyn Storage>>);
+
+impl InnerStorage {
+    pub fn new(inner: impl Storage + 'static) -> InnerStorage {
+        InnerStorage(Arc::new(Mutex::new(inner)))
+    }
+}
+
+impl Storage for InnerStorage {
+    fn save(&self, path: &str, content: &[u8]) -> Result<String, Error> {
+        self.0.save(path, content)
+    }
+    fn load(&self, path: &str) -> Result<Vec<u8>, Error> {
+        self.0.load(path)
+    }
+    fn args(&self) -> StorageArgs {
+        self.0.args()
+    }
+}
 
 #[derive(Debug, Error)]
 pub enum StorageError {
@@ -64,6 +86,23 @@ pub trait Storage {
 
     /// Args for initializing a new Storage
     fn args(&self) -> StorageArgs;
+}
+
+impl<L> Storage for Mutex<L>
+where
+    L: ?Sized + Storage,
+{
+    fn save(&self, path: &str, content: &[u8]) -> Result<String, Error> {
+        self.lock().unwrap().save(path, content)
+    }
+
+    fn load(&self, path: &str) -> Result<Vec<u8>, Error> {
+        self.lock().unwrap().load(path)
+    }
+
+    fn args(&self) -> StorageArgs {
+        self.lock().unwrap().args()
+    }
 }
 
 /// Store files locally into a directory
@@ -125,10 +164,4 @@ impl Storage for FSStorage {
             path: self.subdir.clone(),
         }
     }
-}
-
-pub trait ToWriter {
-    fn to_writer<W>(&self, writer: &mut W) -> Result<(), Error>
-    where
-        W: Write;
 }

@@ -7,13 +7,13 @@ pub mod bigsi;
 pub mod linear;
 pub mod sbt;
 
-pub mod storage;
+#[cfg(feature = "experimental")]
+pub mod greyhound;
 
 pub mod search;
 
 use std::ops::Deref;
 use std::path::Path;
-use std::rc::Rc;
 
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
@@ -21,10 +21,10 @@ use typed_builder::TypedBuilder;
 
 use crate::index::sbt::{Node, SBT};
 use crate::index::search::{search_minhashes, search_minhashes_containment};
-use crate::index::storage::{ReadData, ReadDataError, Storage};
 use crate::signature::{Signature, SigsTrait};
 use crate::sketch::nodegraph::Nodegraph;
 use crate::sketch::Sketch;
+use crate::storage::{InnerStorage, ReadData, ReadDataError, Storage};
 use crate::Error;
 
 pub type MHBT = SBT<Node<Nodegraph>, Signature>;
@@ -140,7 +140,7 @@ pub struct SigStore<T> {
     #[builder(setter(into))]
     metadata: String,
 
-    storage: Option<Rc<dyn Storage>>,
+    storage: Option<InnerStorage>,
 
     #[builder(setter(into), default)]
     data: OnceCell<T>,
