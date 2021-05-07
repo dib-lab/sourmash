@@ -40,19 +40,15 @@ jobs:
           - build: macos
             os: macos-latest
             rust: stable
-            continue: false
           - build: windows
             os: windows-latest
             rust: stable
-            continue: true
           - build: beta
             os: ubuntu-latest
             rust: beta
-            continue: false
           - build: stable
             os: ubuntu-latest
             rust: stable
-            continue: false
     steps:
       - uses: actions/checkout@v1
 
@@ -60,17 +56,6 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
           override: true
-
-      - name: Set up Python 3.8
-        uses: actions/setup-python@v1
-        with:
-          python-version: "3.8"
-
-      - name: Install dependencies
-        continue-on-error: ${{ matrix.continue }}
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e .
 
       - name: Run tests
         uses: actions-rs/cargo@v1

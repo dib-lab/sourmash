@@ -20,6 +20,8 @@ jobs:
           linux-ppc64le,
           linux-s390x,
           macos-x86_64,
+          macos-arm64,
+          windows-x86_64,
         ]
         include:
           - build: linux-x86_64
@@ -39,24 +41,26 @@ jobs:
             arch: s390x
             macos_target: ''
           - build: macos-x86_64
-            os: macos-latest
+            os: macos-10.15
             arch: x86_64
             macos_target: 'MACOSX_DEPLOYMENT_TARGET=10.11'
+          - build: macos-arm64
+            os: macos-10.15
+            arch: arm64
+            macos_target: 'MACOSX_DEPLOYMENT_TARGET=10.15'
+          - build: windows-x86_64
+            os: windows-2019
+            arch: auto64
+            macos_target: ''
       fail-fast: false
 
     steps:
+      - name: Avoid problems with "\r"
+        run: git config --global core.autocrlf input
+
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
-
-      - uses: actions/setup-python@v2
-        name: Install Python
-        with:
-          python-version: '3.9'
-
-      - name: Install cibuildwheel
-        run: |
-          python -m pip install cibuildwheel==1.8.0
 
       - name: Set up QEMU
         if: runner.os == 'Linux'
@@ -64,23 +68,26 @@ jobs:
         with:
           platforms: all
 
+      - uses: actions-rs/toolchain@v1
+        if: runner.os != 'Linux'
+        with:
+          toolchain: stable
+          override: true
+
       - name: Build wheels
+        uses: joerick/cibuildwheel@v1.9.0
         env:
           CIBW_BUILD: "cp39-*"
           CIBW_SKIP: "*-win32 *-manylinux_i686"
-          CIBW_BEFORE_BUILD: 'source .ci/install_cargo.sh'
-          CIBW_ENVIRONMENT: 'PATH="$HOME/.cargo/bin:$PATH"'
+          CIBW_BEFORE_ALL_LINUX: 'source .ci/install_cargo.sh'
+          CIBW_ENVIRONMENT_LINUX: 'PATH="$HOME/.cargo/bin:$PATH"'
           CIBW_ENVIRONMENT_MACOS: ${{ matrix.macos_target }}
-          CIBW_BUILD_VERBOSITY: 3
-          CIBW_ARCHS_LINUX: ${{ matrix.arch }}
-          CIBW_ARCHS_MACOS: ${{ matrix.arch }}
-        run: |
-          python -m cibuildwheel --output-dir dist
-          ls -lR ./dist
+          CIBW_BUILD_VERBOSITY: 1
+          CIBW_ARCHS: ${{ matrix.arch }}
 
       - uses: actions/upload-artifact@v2
         with:
-          path: './dist/sourmash*.whl'
+          path: './wheelhouse/sourmash*.whl'
 
   release:
     name: Publish wheels
