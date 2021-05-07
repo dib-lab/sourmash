@@ -2,7 +2,7 @@ default_language_version:
   python: python3
 repos:
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v3.2.0
+  rev: v3.4.0
   hooks:
   - id: check-ast
 #  - id: check-builtin-literals
@@ -29,7 +29,7 @@ repos:
 # when the full codebase is black, use it directly;
 #  while it isn't, let's use darker to format new/changed code
 -   repo: https://github.com/akaihola/darker
-    rev: 1.2.1
+    rev: 1.2.3
     hooks:
     -   id: darker
 #- repo: https://github.com/psf/black
