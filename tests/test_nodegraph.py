@@ -59,7 +59,7 @@ def test_nodegraph_same_file():
     khmer_ng = load_nodegraph(ng_file)
 
     with NamedTemporaryFile() as f1, NamedTemporaryFile() as f2, NamedTemporaryFile() as f3:
-        sourmash_ng.save(f1.name)
+        sourmash_ng.save(f1.name, version=4)
         khmer_sm_ng.save(f2.name)
         khmer_ng.save(f3.name)
 

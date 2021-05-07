@@ -26,8 +26,12 @@ class Nodegraph(RustObject):
         ng_ptr = rustcall(lib.nodegraph_from_buffer, buf, len(buf))
         return Nodegraph._from_objptr(ng_ptr)
 
-    def save(self, filename):
-        self._methodcall(lib.nodegraph_save, to_bytes(filename))
+    def save(self, filename, version=5):
+        assert version >= 4
+        if version == 4:
+            self._methodcall(lib.nodegraph_save_khmer, to_bytes(filename))
+        else:
+            self._methodcall(lib.nodegraph_save, to_bytes(filename))
 
     def to_bytes(self, compression=1):
         size = ffi.new("uintptr_t *")
@@ -94,7 +98,7 @@ class Nodegraph(RustObject):
             load_nodegraph = khmer.Nodegraph.load
 
         with NamedTemporaryFile() as f:
-            self.save(f.name)
+            self.save(f.name, version=4)
             f.file.flush()
             f.file.seek(0)
             return load_nodegraph(f.name)

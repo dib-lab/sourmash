@@ -261,6 +261,61 @@ For the Rust core library we use `rMAJOR.MINOR.PATCH`
 The Rust version is not automated,
 and must be bumped in `src/core/Cargo.toml`.
 
+## Nodegraph compatibility with khmer
+
+For more information, check the [binary formats](https://khmer.readthedocs.io/en/latest/dev/binary-file-formats.html) section in khmer.
+
+### Version 4 (same as khmer)
+
+The header is in the format below, again in the order of file offset. Value
+macro definitions are given in parenthesis
+
+| Field             | Len | Off | Value                                       |
+| ----------------- | --- | --- | ------------------------------------------- |
+| Magic string      |  4  |   0 | ``OXLI`` (``SAVED_SIGNATURE``)              |
+| Version           |  1  |   4 | ``0x04`` (``SAVED_FORMAT_VERSION``)         |
+| File Type         |  1  |   5 | ``0x02`` (``SAVED_HASHBITS``)               |
+| K-size            |  4  |   6 | k-mer length. [``unsigned int``]            |
+| Number of Tables  |  1  |  10 | Number of Nodegraph tables. [``uint8_t``]   |
+| Occupied Bins     |  8  |  11 | Number of occupied bins                     |
+
+Then follows the Nodegraph's tables. For each table:
+
+| Field             | Len    | Off | Value                                        |
+| ----------------- | ------ | --- | -------------------------------------------- |
+| Table size        |  8     |  0  | Length of table, **in bits** (``uint64_t``). |
+| Bins              |  N/8+1 |  8  | This table's bytes, length given by previous field, divided by 8, plus 1 (``uint8_t``). |
+
+### Version 5
+
+Version 5 is a new version incompatible with the khmer Nodegraphs because it uses
+[BitMagic](http://bitmagic.io) for saving the tables.
+It also includes the number of unique kmers,
+something that both khmer and sourmash calculate when adding new elements
+but don't serialize to the binary format in version 4.
+
+The header is in the format below, again in the order of file offset. Value
+macro definitions are given in parenthesis
+
+| Field             | Len | Off | Value                                     |
+| ----------------- | --- | --- | ----------------------------------------- |
+| Magic string      |  4  |   0 | ``OXLI`` (``SAVED_SIGNATURE``)            |
+| Version           |  1  |   4 | ``0x04`` (``SAVED_FORMAT_VERSION``)       |
+| File Type         |  1  |   5 | ``0x02`` (``SAVED_HASHBITS``)             |
+| K-size            |  4  |   6 | k-mer length. [``unsigned int``]          |
+| Unique k-mers     |  8  |  10 | Number of unique k-mers. [``uint64_t``]   |
+| Number of Tables  |  1  |  10 | Number of Nodegraph tables. [``uint8_t``] |
+| Occupied Bins     |  8  |  11 | Number of occupied bins                   |
+
+Then follows the Nodegraph's tables. Each table is serialized using the
+BitMagic format, and must be deserialized using its deserializing methods.
+For each table:
+
+| Field             | Len | Off | Value                                        |
+| ----------------- | --- | --- | -------------------------------------------- |
+| Table size        |  8  |  0  | Length of table, **in bytes** (``uint8_t``). |
+| Bins              |  N  |  8  | This table's BitMagic bit-vector. Length given by previous field (``BVector``). |
+
 ## Common errors and solutions
 
 ### Cannot import name `to_bytes` from `sourmash.minhash`

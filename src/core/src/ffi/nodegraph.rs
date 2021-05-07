@@ -208,6 +208,23 @@ unsafe fn nodegraph_save(ptr: *const SourmashNodegraph, filename: *const c_char)
 }
 
 ffi_fn! {
+unsafe fn nodegraph_save_khmer(ptr: *const SourmashNodegraph, filename: *const c_char) -> Result<()> {
+    let ng = SourmashNodegraph::as_rust(ptr);
+
+    // FIXME use buffer + len instead of c_str
+    let c_str = {
+        assert!(!filename.is_null());
+
+        CStr::from_ptr(filename)
+    };
+
+    ng.write_v4(&mut std::fs::File::create(c_str.to_str()?)?)?;
+
+    Ok(())
+}
+}
+
+ffi_fn! {
 unsafe fn nodegraph_to_buffer(ptr: *const SourmashNodegraph, compression: u8, size: *mut usize) -> Result<*const u8> {
     let ng = SourmashNodegraph::as_rust(ptr);
 

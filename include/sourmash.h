@@ -278,6 +278,8 @@ uintptr_t nodegraph_noccupied(const SourmashNodegraph *ptr);
 
 uintptr_t nodegraph_ntables(const SourmashNodegraph *ptr);
 
+void nodegraph_save_khmer(const SourmashNodegraph *ptr, const char *filename);
+
 void nodegraph_save(const SourmashNodegraph *ptr, const char *filename);
 
 const uint8_t *nodegraph_to_buffer(const SourmashNodegraph *ptr,

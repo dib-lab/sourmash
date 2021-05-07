@@ -18,7 +18,6 @@ jobs:
           linux-x86_64,
           linux-aarch64,
           linux-ppc64le,
-          linux-s390x,
           macos-x86_64,
         ]
         include:
@@ -33,10 +32,6 @@ jobs:
           - build: linux-ppc64le
             os: ubuntu-18.04
             arch: ppc64le
-            macos_target: ''
-          - build: linux-s390x
-            os: ubuntu-18.04
-            arch: s390x
             macos_target: ''
           - build: macos-x86_64
             os: macos-latest
@@ -71,7 +66,6 @@ jobs:
           CIBW_BEFORE_BUILD: 'source .ci/install_cargo.sh'
           CIBW_ENVIRONMENT: 'PATH="$HOME/.cargo/bin:$PATH"'
           CIBW_ENVIRONMENT_MACOS: ${{ matrix.macos_target }}
-          CIBW_BUILD_VERBOSITY: 3
           CIBW_ARCHS_LINUX: ${{ matrix.arch }}
           CIBW_ARCHS_MACOS: ${{ matrix.arch }}
         run: |
