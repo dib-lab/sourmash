@@ -1,0 +1,210 @@
+{
+  "definitions": {},
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "http://example.com/root.json",
+  "type": "object",
+  "title": "sourmash SBT schema",
+  "required": [
+    "d",
+    "version",
+    "storage",
+    "factory",
+    "nodes"
+  ],
+  "properties": {
+    "d": {
+      "$id": "#/properties/d",
+      "type": "integer",
+      "title": "Number of children for internal nodes",
+      "default": 2,
+      "examples": [
+        2, 5, 10
+      ]
+    },
+    "version": {
+      "$id": "#/properties/version",
+      "type": "integer",
+      "title": "SBT version",
+      "default": 5,
+      "examples": [
+        5
+      ]
+    },
+    "storage": {
+      "$id": "#/properties/storage",
+      "type": "object",
+      "title": "The Storage Schema",
+      "required": [
+        "backend",
+        "args"
+      ],
+      "properties": {
+        "backend": {
+          "$id": "#/properties/storage/properties/backend",
+          "type": "string",
+          "title": "The Backend Schema",
+          "default": "FSStorage",
+          "examples": [
+            "FSStorage", "IPFSStorage", "RedisStorage", "TarStorage"
+          ]
+        },
+        "args": {
+          "$id": "#/properties/storage/properties/args",
+          "type": "object",
+          "title": "The Args Schema",
+          "required": [
+            "path"
+          ],
+          "properties": {
+            "path": {
+              "$id": "#/properties/storage/properties/args/properties/path",
+              "type": "string",
+              "title": "The Path Schema",
+              "default": "",
+              "examples": [
+                ".sbt.v4"
+              ],
+              "pattern": "^(.*)$"
+            }
+          }
+        }
+      }
+    },
+    "factory": {
+      "$id": "#/properties/factory",
+      "type": "object",
+      "title": "The Factory Schema",
+      "required": [
+        "class",
+        "args"
+      ],
+      "properties": {
+        "class": {
+          "$id": "#/properties/factory/properties/class",
+          "type": "string",
+          "title": "The Class Schema",
+          "default": "",
+          "examples": [
+            "GraphFactory"
+          ],
+          "pattern": "^(.*)$"
+        },
+        "args": {
+          "$id": "#/properties/factory/properties/args",
+          "type": "array",
+          "title": "The Args Schema",
+          "items": {
+            "$id": "#/properties/factory/properties/args/items",
+            "type": "integer",
+            "title": "The Items Schema",
+            "default": 0,
+            "examples": [
+              1,
+              100000,
+              4
+            ]
+          }
+        }
+      }
+    },
+    "nodes": {
+      "$id": "#/properties/nodes",
+      "type": "object",
+      "title": "The Nodes Schema",
+      "properties": {
+        "0": {
+          "$id": "#/properties/nodes/properties/0",
+          "type": "object",
+          "title": "The 0 Schema",
+          "required": [
+            "filename",
+            "name",
+            "metadata"
+          ],
+          "properties": {
+            "filename": {
+              "$id": "#/properties/nodes/properties/0/properties/filename",
+              "type": "string",
+              "title": "The Filename Schema",
+              "default": "",
+              "examples": [
+                "internal.0"
+              ],
+              "pattern": "^(.*)$"
+            },
+            "name": {
+              "$id": "#/properties/nodes/properties/0/properties/name",
+              "type": "string",
+              "title": "The Name Schema",
+              "default": "",
+              "examples": [
+                "internal.0"
+              ],
+              "pattern": "^(.*)$"
+            },
+            "metadata": {
+              "$id": "#/properties/nodes/properties/0/properties/metadata",
+              "type": "object",
+              "title": "The Metadata Schema",
+              "required": [],
+              "properties": {
+                "min_n_below": {
+                  "$id": "#/properties/nodes/properties/0/properties/metadata/properties/min_n_below",
+                  "type": "integer",
+                  "title": "The Min_n_below Schema",
+                  "default": 0,
+                  "examples": [
+                    500
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "8": {
+          "$id": "#/properties/nodes/properties/8",
+          "type": "object",
+          "title": "The 8 Schema",
+          "required": [
+            "filename",
+            "name",
+            "metadata"
+          ],
+          "properties": {
+            "filename": {
+              "$id": "#/properties/nodes/properties/8/properties/filename",
+              "type": "string",
+              "title": "The Filename Schema",
+              "default": "",
+              "examples": [
+                "0107d767a345eff67ecdaed2ee5cd7ba"
+              ],
+              "pattern": "^(.*)$"
+            },
+            "name": {
+              "$id": "#/properties/nodes/properties/8/properties/name",
+              "type": "string",
+              "title": "The Name Schema",
+              "default": "",
+              "examples": [
+                "0107d767a345eff67ecdaed2ee5cd7ba"
+              ],
+              "pattern": "^(.*)$"
+            },
+            "metadata": {
+              "$id": "#/properties/nodes/properties/8/properties/metadata",
+              "type": "string",
+              "title": "The Metadata Schema",
+              "default": "",
+              "examples": [
+                "0107d767a345eff67ecdaed2ee5cd7ba"
+              ],
+              "pattern": "^(.*)$"
+            }
+          }
+        }
+      }
+    }
+  }
+}
+

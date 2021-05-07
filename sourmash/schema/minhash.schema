@@ -1,0 +1,185 @@
+{
+  "definitions": {},
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "http://example.com/root.json",
+  "type": "array",
+  "title": "The Root Schema",
+  "items": {
+    "$id": "#/items",
+    "type": "object",
+    "title": "The Items Schema",
+    "required": [
+      "class",
+      "email",
+      "hash_function",
+      "signatures",
+      "version"
+    ],
+    "properties": {
+      "class": {
+        "$id": "#/items/properties/class",
+        "type": "string",
+        "title": "The Class Schema",
+        "default": "",
+        "examples": [
+          "sourmash_signature"
+        ],
+        "pattern": "^(.*)$"
+      },
+      "email": {
+        "$id": "#/items/properties/email",
+        "type": "string",
+        "title": "The Email Schema",
+        "default": "",
+        "examples": [
+          ""
+        ],
+        "pattern": "^(.*)$"
+      },
+      "filename": {
+        "$id": "#/items/properties/filename",
+        "type": "string",
+        "title": "The Filename Schema",
+        "default": "",
+        "examples": [
+          "TARA_ASE_MAG_00031.fa.gz"
+        ],
+        "pattern": "^(.*)$"
+      },
+      "hash_function": {
+        "$id": "#/items/properties/hash_function",
+        "type": "string",
+        "title": "The Hash_function Schema",
+        "default": "",
+        "examples": [
+          "0.murmur64"
+        ],
+        "pattern": "^(.*)$"
+      },
+      "name": {
+        "$id": "#/items/properties/name",
+        "type": "string",
+        "title": "The Name Schema",
+        "default": "",
+        "examples": [
+          "TARA_ASE_MAG_00031"
+        ],
+        "pattern": "^(.*)$"
+      },
+      "signatures": {
+        "$id": "#/items/properties/signatures",
+        "type": "array",
+        "title": "The Signatures Schema",
+        "items": {
+          "$id": "#/items/properties/signatures/items",
+          "type": "object",
+          "title": "The Items Schema",
+          "required": [
+            "ksize",
+            "max_hash",
+            "md5sum",
+            "mins",
+            "molecule",
+            "num",
+            "seed"
+          ],
+          "properties": {
+            "ksize": {
+              "$id": "#/items/properties/signatures/items/properties/ksize",
+              "type": "integer",
+              "title": "The Ksize Schema",
+              "default": 0,
+              "examples": [
+                21
+              ]
+            },
+            "max_hash": {
+              "$id": "#/items/properties/signatures/items/properties/max_hash",
+              "type": "integer",
+              "title": "The Max_hash Schema",
+              "default": 0,
+              "examples": [
+                1844674407370955
+              ]
+            },
+            "md5sum": {
+              "$id": "#/items/properties/signatures/items/properties/md5sum",
+              "type": "string",
+              "title": "The Md5sum Schema",
+              "default": "",
+              "examples": [
+                "880ebec0e38b866f43819d852c1a3224"
+              ],
+              "pattern": "^(.*)$"
+            },
+            "mins": {
+              "$id": "#/items/properties/signatures/items/properties/mins",
+              "type": "array",
+              "title": "The Mins Schema",
+              "items": {
+                "$id": "#/items/properties/signatures/items/properties/mins/items",
+                "type": "integer",
+                "title": "The Items Schema",
+                "default": 0,
+                "examples": [
+                  1840577633899233
+                ]
+              }
+            },
+            "abundances": {
+              "$id": "#/items/properties/signatures/items/properties/abundances",
+              "type": "array",
+              "title": "The Abundances Schema",
+              "items": {
+                "$id": "#/items/properties/signatures/items/properties/abundances/items",
+                "type": "integer",
+                "title": "The Items Schema",
+                "default": 0,
+                "examples": [
+                  1
+                ]
+              }
+            },
+            "molecule": {
+              "$id": "#/items/properties/signatures/items/properties/molecule",
+              "type": "string",
+              "title": "The Molecule Schema",
+              "default": "",
+              "examples": [
+                "DNA"
+              ],
+              "pattern": "^(.*)$"
+            },
+            "num": {
+              "$id": "#/items/properties/signatures/items/properties/num",
+              "type": "integer",
+              "title": "The Num Schema",
+              "default": 0,
+              "examples": [
+                4294967295
+              ]
+            },
+            "seed": {
+              "$id": "#/items/properties/signatures/items/properties/seed",
+              "type": "integer",
+              "title": "The Seed Schema",
+              "default": 0,
+              "examples": [
+                42
+              ]
+            }
+          }
+        }
+      },
+      "version": {
+        "$id": "#/items/properties/version",
+        "type": "number",
+        "title": "The Version Schema",
+        "default": 0.0,
+        "examples": [
+          0.4
+        ]
+      }
+    }
+  }
+}
