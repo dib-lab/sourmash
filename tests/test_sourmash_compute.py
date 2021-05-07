@@ -24,79 +24,68 @@ from sourmash import signature
 from sourmash import VERSION
 
 
-def test_do_sourmash_compute():
-    with utils.TempDirectory() as location:
-        testdata1 = utils.get_test_data('short.fa')
-        status, out, err = utils.runscript('sourmash',
-                                           ['compute', '-k', '31', testdata1],
-                                           in_directory=location)
-
-        sigfile = os.path.join(location, 'short.fa.sig')
-        assert os.path.exists(sigfile)
-
-        sig = next(signature.load_signatures(sigfile))
-        assert str(sig).endswith('short.fa')
-
-
 @utils.in_tempdir
-def test_do_sourmash_compute_outdir(c):
-    testdata1 = utils.get_test_data('short.fa')
-    status, out, err = utils.runscript('sourmash',
-                                       ['compute', '-k', '31', testdata1,
-                                        '--outdir', c.location])
+def test_do_sourmash_compute(c):
+    testdata1 = utils.get_test_data("short.fa")
 
+    c.run_sourmash("compute", "-k", "31", testdata1)
 
-    sigfile = os.path.join(c.location, 'short.fa.sig')
+    sigfile = c.output("short.fa.sig")
     assert os.path.exists(sigfile)
 
     sig = next(signature.load_signatures(sigfile))
     assert str(sig).endswith('short.fa')
 
 
-def test_do_sourmash_compute_output_valid_file():
+@utils.in_tempdir
+def test_do_sourmash_compute_outdir(c):
+    testdata1 = utils.get_test_data("short.fa")
+
+    c.run_sourmash("compute", "-k", "31", testdata1, "--outdir", c.location)
+
+    sigfile = c.output("short.fa.sig")
+    assert os.path.exists(sigfile)
+
+    sig = next(signature.load_signatures(sigfile))
+    assert str(sig).endswith("short.fa")
+
+
+@utils.in_tempdir
+def test_do_sourmash_compute_output_valid_file(c):
     """ Trigger bug #123 """
-    with utils.TempDirectory() as location:
-        testdata1 = utils.get_test_data('short.fa')
-        testdata2 = utils.get_test_data('short2.fa')
-        testdata3 = utils.get_test_data('short3.fa')
-        sigfile = os.path.join(location, 'short.fa.sig')
+    testdata1 = utils.get_test_data("short.fa")
+    testdata2 = utils.get_test_data("short2.fa")
+    testdata3 = utils.get_test_data("short3.fa")
+    sigfile = c.output("short.fa.sig")
 
-        status, out, err = utils.runscript('sourmash',
-                                           ['compute', '-k', '31', '-o', sigfile,
-                                            testdata1,
-                                            testdata2, testdata3],
-                                           in_directory=location)
+    c.run_sourmash(
+        "compute", "-k", "31", "-o", sigfile, testdata1, testdata2, testdata3
+    )
 
-        assert os.path.exists(sigfile)
-        assert not out # stdout should be empty
+    assert os.path.exists(sigfile)
+    assert not c.last_result.out  # stdout should be empty
 
-        # is it valid json?
-        with open(sigfile, 'r') as f:
-            data = json.load(f)
+    # is it valid json?
+    with open(sigfile, "r") as f:
+        data = json.load(f)
 
-        filesigs = [sig['filename'] for sig in data]
-        assert all(testdata in filesigs
-                   for testdata in (testdata1, testdata2, testdata3))
+    filesigs = [sig["filename"] for sig in data]
+    assert all(testdata in filesigs for testdata in (testdata1, testdata2, testdata3))
 
 
-def test_do_sourmash_compute_output_stdout_valid():
-    with utils.TempDirectory() as location:
-        testdata1 = utils.get_test_data('short.fa')
-        testdata2 = utils.get_test_data('short2.fa')
-        testdata3 = utils.get_test_data('short3.fa')
+@utils.in_tempdir
+def test_do_sourmash_compute_output_stdout_valid(c):
+    testdata1 = utils.get_test_data("short.fa")
+    testdata2 = utils.get_test_data("short2.fa")
+    testdata3 = utils.get_test_data("short3.fa")
 
-        status, out, err = utils.runscript('sourmash',
-                                           ['compute', '-k', '31', '-o', '-',
-                                            testdata1,
-                                            testdata2, testdata3],
-                                           in_directory=location)
+    c.run_sourmash("compute", "-k", "31", "-o", "-", testdata1, testdata2, testdata3)
 
-        # is it valid json?
-        data = json.loads(out)
+    # is it valid json?
+    data = json.loads(c.last_result.out)
 
-        filesigs = [sig['filename'] for sig in data]
-        assert all(testdata in filesigs
-                   for testdata in (testdata1, testdata2, testdata3))
+    filesigs = [sig["filename"] for sig in data]
+    assert all(testdata in filesigs for testdata in (testdata1, testdata2, testdata3))
 
 
 @utils.in_tempdir
