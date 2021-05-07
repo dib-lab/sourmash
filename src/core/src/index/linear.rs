@@ -7,8 +7,9 @@ use std::rc::Rc;
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
-use crate::index::storage::{FSStorage, ReadData, Storage, StorageInfo, ToWriter};
+use crate::index::storage::{FSStorage, ReadData, Storage, StorageInfo};
 use crate::index::{Comparable, DatasetInfo, Index, SigStore};
+use crate::traits::ToWriter;
 use crate::Error;
 
 #[derive(TypedBuilder)]

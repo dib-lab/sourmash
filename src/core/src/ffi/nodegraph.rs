@@ -2,8 +2,8 @@ use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::slice;
 
-use crate::index::sbt::Update;
 use crate::sketch::nodegraph::Nodegraph;
+use crate::traits::Update;
 
 use crate::ffi::minhash::SourmashKmerMinHash;
 use crate::ffi::utils::ForeignObject;

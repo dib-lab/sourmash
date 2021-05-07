@@ -2,9 +2,9 @@ use std::ffi::CStr;
 use std::os::raw::c_char;
 use std::slice;
 
-use crate::index::sbt::Update;
 use crate::signature::SigsTrait;
 use crate::sketch::hyperloglog::HyperLogLog;
+use crate::traits::Update;
 
 use crate::ffi::minhash::SourmashKmerMinHash;
 use crate::ffi::utils::ForeignObject;

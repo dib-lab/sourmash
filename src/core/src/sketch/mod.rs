@@ -1,5 +1,7 @@
 pub mod hyperloglog;
 pub mod minhash;
+
+#[cfg(not(all(target_arch = "wasm32", target_vendor = "unknown")))]
 pub mod nodegraph;
 
 use serde::{Deserialize, Serialize};

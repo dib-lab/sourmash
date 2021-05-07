@@ -42,9 +42,11 @@ pub enum SourmashError {
     #[error("Set error rate to a value smaller than 0.367696 and larger than 0.00203125")]
     HLLPrecisionBounds,
 
+    #[cfg(not(all(target_arch = "wasm32", target_vendor = "unknown")))]
     #[error(transparent)]
     ReadDataError(#[from] crate::index::storage::ReadDataError),
 
+    #[cfg(not(all(target_arch = "wasm32", target_vendor = "unknown")))]
     #[error(transparent)]
     StorageError(#[from] crate::index::storage::StorageError),
 

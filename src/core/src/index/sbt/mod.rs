@@ -24,14 +24,11 @@ use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
-use crate::index::storage::{FSStorage, ReadData, Storage, StorageInfo, ToWriter};
+use crate::index::storage::{FSStorage, ReadData, Storage, StorageInfo};
 use crate::index::{Comparable, DatasetInfo, Index, SigStore};
 use crate::signature::Signature;
+use crate::traits::{ToWriter, Update};
 use crate::Error;
-
-pub trait Update<O> {
-    fn update(&self, other: &mut O) -> Result<(), Error>;
-}
 
 pub trait FromFactory<N> {
     fn factory(&self, name: &str) -> Result<N, Error>;

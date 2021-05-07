@@ -5,22 +5,9 @@ use getset::{CopyGetters, Getters, Setters};
 use typed_builder::TypedBuilder;
 
 use crate::encodings::HashFunctions;
-use crate::index::MHBT;
 use crate::signature::Signature;
 use crate::sketch::minhash::{max_hash_for_scaled, KmerMinHashBTree};
 use crate::sketch::Sketch;
-use crate::Error;
-
-pub fn prepare(index_path: &str) -> Result<(), Error> {
-    let mut index = MHBT::from_path(index_path)?;
-
-    // TODO equivalent to fill_internal in python
-    //unimplemented!();
-
-    index.save_file(index_path, None)?;
-
-    Ok(())
-}
 
 impl Signature {
     pub fn from_params(params: &ComputeParameters) -> Signature {
