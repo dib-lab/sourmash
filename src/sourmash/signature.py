@@ -115,6 +115,14 @@ class SourmashSignature(RustObject):
     def license(self):
         return decode_str(self._methodcall(lib.signature_get_license))
 
+    @property
+    def seqlen(self):
+        return self._methodcall(lib.signature_get_seqlen)
+
+    @seqlen.setter
+    def seqlen(self, value):
+        self._methodcall(lib.signature_set_seqlen, value)
+
     def _display_name(self, max_length=0):
         name = self._name
         filename = self.filename

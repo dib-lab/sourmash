@@ -251,6 +251,18 @@ unsafe fn signatures_save_buffer(ptr: *const *const SourmashSignature, size: usi
 }
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn signature_get_seqlen(ptr: *const SourmashSignature) -> u64 {
+    let sig = SourmashSignature::as_rust(ptr);
+    sig.seqlen() as u64
+}
+
+#[no_mangle]
+pub unsafe extern "C" fn signature_set_seqlen(ptr: *mut SourmashSignature, seqlen: u64) {
+    let sig = SourmashSignature::as_rust_mut(ptr);
+    sig.set_seqlen(seqlen)
+}
+
 ffi_fn! {
 unsafe fn signatures_load_path(ptr: *const c_char,
                                _ignore_md5sum: bool,

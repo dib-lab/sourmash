@@ -8,6 +8,7 @@ in
   pkgs.mkShell {
     buildInputs = [
       rustPlatform.rust.cargo
+      rust-cbindgen
       git
       stdenv.cc.cc.lib
       (python38.withPackages(ps: with ps; [ virtualenv tox setuptools ]))

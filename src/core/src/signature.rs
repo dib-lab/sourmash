@@ -266,6 +266,10 @@ pub struct Signature {
     #[builder(default = default_license())]
     license: String,
 
+    #[serde(default)]
+    #[builder(default)]
+    seqlen: u64,
+
     pub(crate) signatures: Vec<Sketch>,
 
     #[serde(default = "default_version")]
@@ -298,6 +302,14 @@ impl Signature {
 
     pub fn set_name(&mut self, name: &str) {
         self.name = Some(name.into())
+    }
+
+    pub fn seqlen(&self) -> u64 {
+        self.seqlen
+    }
+
+    pub fn set_seqlen(&mut self, seqlen: u64) {
+        self.seqlen = seqlen;
     }
 
     pub fn filename(&self) -> String {
@@ -525,6 +537,7 @@ impl Default for Signature {
             hash_function: "0.murmur64".to_string(),
             license: default_license(),
             filename: None,
+            seqlen: 0,
             name: None,
             signatures: Vec::<Sketch>::new(),
             version: default_version(),

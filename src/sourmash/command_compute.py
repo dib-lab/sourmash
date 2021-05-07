@@ -158,6 +158,7 @@ def _compute_individual(args, signatures_factory):
             notify('skipping {} - already done', filename)
             continue
 
+        sequence_length = 0
         if args.singleton:
             siglist = []
             n = None
@@ -166,7 +167,9 @@ def _compute_individual(args, signatures_factory):
                 sigs = signatures_factory()
                 add_seq(sigs, record.sequence,
                         args.input_is_protein, args.check_sequence)
+                sequence_length += len(record.sequence)
 
+                set_sig_seqlen(sigs, sequence_length)
                 set_sig_name(sigs, filename, name=record.name)
                 siglist.extend(sigs)
 
@@ -190,6 +193,8 @@ def _compute_individual(args, signatures_factory):
                     elif args.name_from_first:
                         name = record.name
 
+                sequence_length += len(record.sequence)
+
                 add_seq(sigs, record.sequence,
                         args.input_is_protein, args.check_sequence)
 
@@ -197,6 +202,7 @@ def _compute_individual(args, signatures_factory):
                 notify('...{} {} sequences', filename, n, end='')
 
                 set_sig_name(sigs, filename, name)
+                set_sig_seqlen(sigs, sequence_length)
                 siglist.extend(sigs)
 
                 notify(f'calculated {len(siglist)} signatures for {n+1} sequences in {filename}')
@@ -255,6 +261,10 @@ def add_seq(sigs, seq, input_is_protein, check_sequence):
         else:
             sig.add_sequence(seq, not check_sequence)
 
+
+def set_sig_seqlen(sigs, sequence_length):
+    for sig in sigs:
+        sig.seqlen = sequence_length
 
 def set_sig_name(sigs, filename, name=None):
     if filename == '-':         # if stdin, set filename to empty.

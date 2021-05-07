@@ -312,6 +312,8 @@ SourmashKmerMinHash **signature_get_mhs(const SourmashSignature *ptr, uintptr_t 
 
 SourmashStr signature_get_name(const SourmashSignature *ptr);
 
+uint64_t signature_get_seqlen(const SourmashSignature *ptr);
+
 uintptr_t signature_len(const SourmashSignature *ptr);
 
 SourmashSignature *signature_new(void);
@@ -325,6 +327,8 @@ void signature_set_filename(SourmashSignature *ptr, const char *name);
 void signature_set_mh(SourmashSignature *ptr, const SourmashKmerMinHash *other);
 
 void signature_set_name(SourmashSignature *ptr, const char *name);
+
+void signature_set_seqlen(SourmashSignature *ptr, uint64_t seqlen);
 
 SourmashSignature **signatures_load_buffer(const char *ptr,
                                            uintptr_t insize,
