@@ -1446,6 +1446,21 @@ def test_single_summarize():
 
         assert 'loaded 1 signatures from 1 files total.' in err
         assert '100.0%   200   Bacteria;Proteobacteria;Gammaproteobacteria;Alteromonadales' in out
+        
+def test_single_summarize_query_from_file():
+    with utils.TempDirectory() as location:
+        db1 = utils.get_test_data('lca/delmont-1.lca.json')
+        input_sig = utils.get_test_data('lca/TARA_ASE_MAG_00031.sig')
+
+        cmd = ['lca', 'summarize', '--db', db1, '--query-from-file', 'test.txt']
+        status, out, err = utils.runscript('sourmash', cmd)
+
+        print(cmd)
+        print(out)
+        print(err)
+
+        assert 'loaded 1 signatures from 1 files total.' in err
+        assert '100.0%   200   Bacteria;Proteobacteria;Gammaproteobacteria;Alteromonadales' in out
 
 
 def test_single_summarize_singleton():
