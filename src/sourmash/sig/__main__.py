@@ -34,6 +34,7 @@ subtract <signature> <other_sig> [...]    - subtract one or more signatures
 import [ ... ]                            - import a mash or other signature
 export <signature>                        - export a signature, e.g. to mash
 overlap <signature1> <signature2>         - see detailed comparison of sigs
+abundhist <signature> [<sig> ...]         - calculate abundance histogram
 
 ** Use '-h' to get subcommand-specific help, e.g.
 
@@ -831,6 +832,85 @@ def export(args):
     with FileOutput(args.output, 'wt') as fp:
         print(json.dumps(x), file=fp)
     notify("exported signature {} ({})", query, query.md5sum()[:8])
+
+
+
+
+def abundhist(args):
+    """
+    output abundance histogram and/or raw abundances.
+    """
+    import numpy, collections
+    import termplotlib as tpl
+
+    set_quiet(args.quiet)
+    moltype = sourmash_args.calculate_moltype(args)
+
+    outlist = []
+    total_loaded = 0
+    for filename in args.signatures:
+        siglist = sourmash.load_file_as_signatures(filename, ksize=args.ksize,
+                                                   select_moltype=moltype)
+        siglist = list(siglist)
+
+        total_loaded += len(siglist)
+
+        # select!
+        if args.md5 is not None:
+            siglist = [ ss for ss in siglist if args.md5 in ss.md5sum() ]
+        if args.name is not None:
+            siglist = [ ss for ss in siglist if args.name in ss.name() ]
+
+    notify("loaded {} total that matched ksize & molecule type",
+           total_loaded)
+    if len(siglist) != total_loaded:
+        notify("selected {} via name / md5 selectors".format(len(siglist)))
+    notify('')
+
+    counts_d = collections.defaultdict(int)
+    for ss in siglist:
+        for hashval, abund in ss.minhash.hashes.items():
+            counts_d[hashval] += abund
+
+    all_counts = list(counts_d.values())
+
+    min_range = 1
+    if args.min is not None:
+        min_range = args.min
+    max_range = max(all_counts)
+    if args.max is not None:
+        max_range = args.max
+
+    n_bins = args.bins
+    if max_range - min_range + 1 < n_bins:
+        n_bins = max_range - min_range + 1
+
+    # make hist
+    counts, bin_edges = numpy.histogram(all_counts,
+                                        range=(min_range, max_range),
+                                        bins=n_bins)
+    bin_edges = bin_edges.astype(int)
+
+    # plot
+    fig = tpl.figure()
+    f = fig.barh(counts, [ str(x) for x in bin_edges[1:] ], force_ascii=True)
+    fig.show()
+
+    # output histogram in csv?
+    if args.output:
+        with FileOutput(args.output, 'wt') as fp:
+            w = csv.writer(fp)
+            w.writerow(['count', 'n_count'])
+            for nc, c in zip(counts, bin_edges[1:]):
+                w.writerow([c, nc])
+
+    # output raw counts tagged with hashval?
+    if args.abundances:
+        with FileOutput(args.abundances, 'wt') as fp:
+            w = csv.writer(fp)
+            w.writerow(['hashval', 'count'])
+            for hashval, count in counts_d.items():
+                w.writerow([hashval, count])
 
 
 def main(arglist=None):

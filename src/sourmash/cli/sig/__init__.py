@@ -11,6 +11,7 @@ from . import downsample
 from . import extract
 from . import filter
 from . import flatten
+from . import abundhist
 from . import intersect
 from . import merge
 from . import rename
