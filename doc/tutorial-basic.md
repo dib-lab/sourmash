@@ -208,6 +208,17 @@ Here's a PNG version:
 
 ![E. coli comparison plot](_static/ecoli_cmp.matrix.png)
 
+````{panels}
+
+---
+
+```{dropdown} Click here if you want to know more about the above chart
+"Gene" trees represent the evolutionary history of the genes included in the study. ... Sequences from different homologs can be included in a gene tree; the subsequent analyses should cluster orthologs, thus demonstrating the evolutionary history of the orthologs.
+```
+
+
+````
+
 ## What's in my metagenome?
 
 Download a database containing all of the GenBank microbial genomes:
