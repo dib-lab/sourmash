@@ -299,3 +299,18 @@ class RedisStorage(Storage):
 
     def __exit__(self, type, value, traceback):
         pass
+
+
+class MemStorage(Storage):
+
+    def __init__(self):
+        self._storage = {}
+
+    def save(self, path, content):
+        if not isinstance(content, bytes):
+            content = bytes(content)
+        self._storage[path] = content
+        return path
+
+    def load(self, path):
+        return self._storage.get(path, None)

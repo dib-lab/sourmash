@@ -1,6 +1,8 @@
+use std::collections::HashMap;
 use std::fs::{DirBuilder, File};
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::PathBuf;
+use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -131,4 +133,29 @@ pub trait ToWriter {
     fn to_writer<W>(&self, writer: &mut W) -> Result<(), Error>
     where
         W: Write;
+}
+
+#[derive(Default)]
+pub struct MemStorage {
+    storage: Mutex<HashMap<String, Vec<u8>>>,
+}
+
+impl MemStorage {}
+
+impl Storage for MemStorage {
+    fn save(&self, path: &str, content: &[u8]) -> Result<String, Error> {
+        let mut lock = self.storage.lock().unwrap();
+        lock.insert(path.into(), content.into());
+        Ok(path.into())
+    }
+
+    fn load(&self, path: &str) -> Result<Vec<u8>, Error> {
+        let lock = self.storage.lock().unwrap();
+        let v = lock.get(path).ok_or(ReadDataError::LoadError)?;
+        Ok(v.clone())
+    }
+
+    fn args(&self) -> StorageArgs {
+        unimplemented!()
+    }
 }

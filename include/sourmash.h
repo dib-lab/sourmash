@@ -50,6 +50,8 @@ typedef struct SourmashHyperLogLog SourmashHyperLogLog;
 
 typedef struct SourmashKmerMinHash SourmashKmerMinHash;
 
+typedef struct SourmashMemStorage SourmashMemStorage;
+
 typedef struct SourmashNodegraph SourmashNodegraph;
 
 typedef struct SourmashSignature SourmashSignature;
@@ -247,6 +249,10 @@ double kmerminhash_similarity(const SourmashKmerMinHash *ptr,
 void kmerminhash_slice_free(uint64_t *ptr, uintptr_t insize);
 
 bool kmerminhash_track_abundance(const SourmashKmerMinHash *ptr);
+
+void memstorage_free(SourmashMemStorage *ptr);
+
+SourmashMemStorage *memstorage_new(void);
 
 void nodegraph_buffer_free(uint8_t *ptr, uintptr_t insize);
 

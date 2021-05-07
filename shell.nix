@@ -15,6 +15,7 @@ in
       (python37.withPackages(ps: with ps; [ virtualenv setuptools ]))
       wasmtime
       wasm-pack
+      rust-cbindgen
     ];
 
     shellHook = ''
