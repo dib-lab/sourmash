@@ -15,12 +15,12 @@ from .sbtmh import load_sbt_index, create_sbt_index
 from . import signature as sig
 from . import sourmash_args
 from .logging import notify, error, print_results, set_quiet
-from .sourmash_args import (DEFAULT_LOAD_K, FileOutput, FileOutputCSV,
+from .sourmash_args import (FileOutput, FileOutputCSV,
                             SaveSignaturesToLocation)
+from .search import prefetch_database
+from .index import LazyLinearIndex
 
 WATERMARK_SIZE = 10000
-
-from .command_compute import compute
 
 
 def compare(args):
@@ -587,7 +587,8 @@ def categorize(args):
             query = orig_query
 
         results = []
-        for match, score in db.find(search_obj, query):
+        for sr in db.find(search_obj, query):
+            match = sr.signature
             if match.md5sum() != query.md5sum(): # ignore self.
                 results.append((orig_query.similarity(match), match))
 
@@ -650,6 +651,29 @@ def gather(args):
         error('Nothing found to search!')
         sys.exit(-1)
 
+    if args.linear:             # force linear traversal?
+        databases = [ LazyLinearIndex(db) for db in databases ]
+
+    if args.prefetch:           # note: on by default!
+        notify("Starting prefetch sweep across databases.")
+        prefetch_query = copy.copy(query)
+        prefetch_query.minhash = prefetch_query.minhash.flatten()
+        save_prefetch = SaveSignaturesToLocation(args.save_prefetch)
+        save_prefetch.open()
+
+        counters = []
+        for db in databases:
+            counter = db.counter_gather(prefetch_query, args.threshold_bp)
+            save_prefetch.add_many(counter.siglist)
+            counters.append(counter)
+
+        notify(f"Found {len(save_prefetch)} signatures via prefetch; now doing gather.")
+        save_prefetch.close()
+    else:
+        counters = databases
+
+    ## ok! now do gather -
+
     found = []
     weighted_missed = 1
     is_abundance = query.minhash.track_abundance and not args.ignore_abundance
@@ -657,7 +681,9 @@ def gather(args):
     new_max_hash = query.minhash._max_hash
     next_query = query
 
-    for result, weighted_missed, new_max_hash, next_query in gather_databases(query, databases, args.threshold_bp, args.ignore_abundance):
+    gather_iter = gather_databases(query, counters, args.threshold_bp,
+                                   args.ignore_abundance)
+    for result, weighted_missed, new_max_hash, next_query in gather_iter:
         if not len(found):                # first result? print header.
             if is_abundance:
                 print_results("")
@@ -802,10 +828,19 @@ def multigather(args):
                 error('no query hashes!? skipping to next..')
                 continue
 
+            counters = []
+            prefetch_query = copy.copy(query)
+            prefetch_query.minhash = prefetch_query.minhash.flatten()
+
+            counters = []
+            for db in databases:
+                counter = db.counter_gather(prefetch_query, args.threshold_bp)
+                counters.append(counter)
+
             found = []
             weighted_missed = 1
             is_abundance = query.minhash.track_abundance and not args.ignore_abundance
-            for result, weighted_missed, new_max_hash, next_query in gather_databases(query, databases, args.threshold_bp, args.ignore_abundance):
+            for result, weighted_missed, new_max_hash, next_query in gather_databases(query, counters, args.threshold_bp, args.ignore_abundance):
                 if not len(found):                # first result? print header.
                     if is_abundance:
                         print_results("")
@@ -993,3 +1028,158 @@ def migrate(args):
 
     notify('saving SBT under "{}".', args.sbt_name)
     tree.save(args.sbt_name, structure_only=True)
+
+
+def prefetch(args):
+    "Output the 'raw' results of a containment/overlap search."
+
+    # load databases from files, too.
+    if args.db_from_file:
+        more_db = sourmash_args.load_pathlist_from_file(args.db_from_file)
+        args.databases.extend(more_db)
+
+    if not args.databases:
+        notify("ERROR: no databases or signatures to search!?")
+        sys.exit(-1)
+
+    if not (args.save_unmatched_hashes or args.save_matching_hashes or
+            args.save_matches or args.output):
+        notify("WARNING: no output(s) specified! Nothing will be saved from this prefetch!")
+
+    # figure out what k-mer size and molecule type we're looking for here
+    ksize = args.ksize
+    moltype = sourmash_args.calculate_moltype(args)
+
+    # load the query signature & figure out all the things
+    query = sourmash_args.load_query_signature(args.query,
+                                               ksize=args.ksize,
+                                               select_moltype=moltype,
+                                               select_md5=args.md5)
+    notify('loaded query: {}... (k={}, {})', str(query)[:30],
+                                             query.minhash.ksize,
+                                             sourmash_args.get_moltype(query))
+
+    # verify signature was computed with scaled.
+    if not query.minhash.scaled:
+        error('query signature needs to be created with --scaled')
+        sys.exit(-1)
+
+    # if with track_abund, flatten me
+    query_mh = query.minhash
+    if query_mh.track_abundance:
+        query_mh = query_mh.flatten()
+
+    # downsample if/as requested
+    if args.scaled:
+        notify(f'downsampling query from scaled={query_mh.scaled} to {int(args.scaled)}')
+        query_mh = query_mh.downsample(scaled=args.scaled)
+    notify(f"all sketches will be downsampled to scaled={query_mh.scaled}")
+
+    # empty?
+    if not len(query_mh):
+        error('no query hashes!? exiting.')
+        sys.exit(-1)
+
+    query.minhash = query_mh
+
+    # set up CSV output, write headers, etc.
+    csvout_fp = None
+    csvout_w = None
+    if args.output:
+        fieldnames = ['intersect_bp', 'jaccard',
+                      'max_containment', 'f_query_match', 'f_match_query',
+                      'match_filename', 'match_name', 'match_md5', 'match_bp',
+                      'query_filename', 'query_name', 'query_md5', 'query_bp']
+
+        csvout_fp = FileOutput(args.output, 'wt').open()
+        csvout_w = csv.DictWriter(csvout_fp, fieldnames=fieldnames)
+        csvout_w.writeheader()
+
+    # track & maybe save matches progressively
+    matches_out = SaveSignaturesToLocation(args.save_matches)
+    matches_out.open()
+    if args.save_matches:
+        notify("saving all matching database signatures to '{}'",
+               args.save_matches)
+
+    # iterate over signatures in db one at a time, for each db;
+    # find those with sufficient overlap
+    noident_mh = copy.copy(query_mh)
+    did_a_search = False        # track whether we did _any_ search at all!
+    for dbfilename in args.databases:
+        notify(f"loading signatures from '{dbfilename}'")
+
+        db = sourmash_args.load_file_as_index(dbfilename)
+
+        # force linear traversal?
+        if args.linear:
+            db = LazyLinearIndex(db)
+
+        db = db.select(ksize=ksize, moltype=moltype,
+                       containment=True, scaled=True)
+
+        if not db:
+            notify(f"...no compatible signatures in '{dbfilename}'; skipping")
+            continue
+
+        for result in prefetch_database(query, db, args.threshold_bp):
+            match = result.match
+
+            # track remaining "untouched" hashes.
+            noident_mh.remove_many(match.minhash.hashes)
+
+            # output match info as we go
+            if csvout_fp:
+                d = dict(result._asdict())
+                del d['match']                 # actual signatures not in CSV.
+                del d['query']
+                csvout_w.writerow(d)
+
+            # output match signatures as we go (maybe)
+            matches_out.add(match)
+
+            if matches_out.count % 10 == 0:
+                notify(f"total of {matches_out.count} matching signatures so far.",
+                       end="\r")
+
+        did_a_search = True
+
+        # flush csvout so that things get saved progressively
+        if csvout_fp:
+            csvout_fp.flush()
+
+        # delete db explicitly ('cause why not)
+        del db
+
+    if not did_a_search:
+        notify("ERROR in prefetch: no compatible signatures in any databases?!")
+        sys.exit(-1)
+
+    notify(f"total of {matches_out.count} matching signatures.")
+    matches_out.close()
+
+    if csvout_fp:
+        notify(f"saved {matches_out.count} matches to CSV file '{args.output}'")
+        csvout_fp.close()
+
+    matched_query_mh = copy.copy(query_mh)
+    matched_query_mh.remove_many(noident_mh.hashes)
+    notify(f"of {len(query_mh)} distinct query hashes, {len(matched_query_mh)} were found in matches above threshold.")
+    notify(f"a total of {len(noident_mh)} query hashes remain unmatched.")
+
+    if args.save_matching_hashes:
+        filename = args.save_matching_hashes
+        notify(f"saving {len(matched_query_mh)} matched hashes to '{filename}'")
+        ss = sig.SourmashSignature(matched_query_mh)
+        with open(filename, "wt") as fp:
+            sig.save_signatures([ss], fp)
+
+    if args.save_unmatched_hashes:
+        filename = args.save_unmatched_hashes
+        notify(f"saving {len(noident_mh)} unmatched hashes to '{filename}'")
+        ss = sig.SourmashSignature(noident_mh)
+        with open(filename, "wt") as fp:
+            sig.save_signatures([ss], fp)
+
+    return 0
+    

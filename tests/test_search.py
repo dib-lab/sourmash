@@ -189,9 +189,9 @@ def test_make_gather_query_high_threshold():
     for i in range(100):
         mh.add_hash(i)
 
-    # effective threshold > 1; no object returned
-    search_obj = make_gather_query(mh, 200000)
-    assert search_obj == None
+    # effective threshold > 1; raise ValueError
+    with pytest.raises(ValueError):
+        search_obj = make_gather_query(mh, 200000)
 
 
 class FakeIndex(LinearIndex):

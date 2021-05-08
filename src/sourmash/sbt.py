@@ -19,7 +19,7 @@ from cachetools import Cache
 from .exceptions import IndexNotSupported
 from .sbt_storage import FSStorage, IPFSStorage, RedisStorage, ZipStorage
 from .logging import error, notify, debug
-from .index import Index
+from .index import Index, IndexSearchResult
 
 from .nodegraph import Nodegraph, extract_nodegraph_info, calc_expected_collisions
 
@@ -346,7 +346,7 @@ class SBT(Index):
 
         return matches
 
-    def find(self, search_fn, query, *args, **kwargs):
+    def find(self, search_fn, query, **kwargs):
         """
         Do a Jaccard similarity or containment search, yield results.
 
@@ -445,8 +445,8 @@ class SBT(Index):
             return False
 
         # & execute!
-        for n in self._find_nodes(node_search, *args, **kwargs):
-            yield n.data, results[n.data]
+        for n in self._find_nodes(node_search, **kwargs):
+            yield IndexSearchResult(results[n.data], n.data, self.location)
 
     def _rebuild_node(self, pos=0):
         """Recursively rebuilds an internal node (if it is not present).

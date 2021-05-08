@@ -169,8 +169,8 @@ def test_tree_old_load(old_version):
     # fix the test for the new search API, we had to adjust
     # the threshold.
     search_obj = make_jaccard_search_query(threshold=0.05)
-    results_old = {str(s) for s in tree_old.find(search_obj, to_search)}
-    results_cur = {str(s) for s in tree_cur.find(search_obj, to_search)}
+    results_old = {str(s.signature) for s in tree_old.find(search_obj, to_search)}
+    results_cur = {str(s.signature) for s in tree_cur.find(search_obj, to_search)}
 
     assert results_old == results_cur
     assert len(results_old) == 4
@@ -199,7 +199,7 @@ def test_tree_save_load(n_children):
     print('*' * 60)
     print("{}:".format(to_search.metadata))
     search_obj = make_jaccard_search_query(threshold=0.1)
-    old_result = {str(s) for s in tree.find(search_obj, to_search.data)}
+    old_result = {str(s.signature) for s in tree.find(search_obj, to_search.data)}
     print(*old_result, sep='\n')
 
     with utils.TempDirectory() as location:
@@ -210,7 +210,7 @@ def test_tree_save_load(n_children):
         print('*' * 60)
         print("{}:".format(to_search.metadata))
         search_obj = make_jaccard_search_query(threshold=0.1)
-        new_result = {str(s) for s in tree.find(search_obj, to_search.data)}
+        new_result = {str(s.signature) for s in tree.find(search_obj, to_search.data)}
         print(*new_result, sep='\n')
 
         assert old_result == new_result
@@ -231,8 +231,8 @@ def test_search_minhashes():
     # this fails if 'search_obj' is calc containment and not similarity.
     search_obj = make_jaccard_search_query(threshold=0.08)
     results = tree.find(search_obj, to_search.data)
-    for (match, score) in results:
-        assert to_search.data.jaccard(match) >= 0.08
+    for sr in results:
+        assert to_search.data.jaccard(sr.signature) >= 0.08
 
     print(results)
 
@@ -260,7 +260,7 @@ def test_binary_nary_tree():
     print("{}:".format(to_search.metadata))
     for d, tree in trees.items():
         search_obj = make_jaccard_search_query(threshold=0.1)
-        results[d] = {str(s) for s in tree.find(search_obj, to_search.data)}
+        results[d] = {str(s.signature) for s in tree.find(search_obj, to_search.data)}
     print(*results[2], sep='\n')
 
     assert results[2] == results[5]
@@ -295,8 +295,8 @@ def test_sbt_combine(n_children):
 
     to_search = load_one_signature(utils.get_test_data(utils.SIG_FILES[0]))
     search_obj = make_jaccard_search_query(threshold=0.1)
-    t1_result = {str(s) for s in tree_1.find(search_obj, to_search)}
-    tree_result = {str(s) for s in tree.find(search_obj, to_search)}
+    t1_result = {str(s.signature) for s in tree_1.find(search_obj, to_search)}
+    tree_result = {str(s.signature) for s in tree.find(search_obj, to_search)}
     assert t1_result == tree_result
 
     # TODO: save and load both trees
@@ -329,7 +329,7 @@ def test_sbt_fsstorage():
         print('*' * 60)
         print("{}:".format(to_search.metadata))
         search_obj = make_jaccard_search_query(threshold=0.1)
-        old_result = {str(s) for s in tree.find(search_obj, to_search.data)}
+        old_result = {str(s.signature) for s in tree.find(search_obj, to_search.data)}
         print(*old_result, sep='\n')
 
         with FSStorage(location, '.fstree') as storage:
@@ -339,7 +339,7 @@ def test_sbt_fsstorage():
         print('*' * 60)
         print("{}:".format(to_search.metadata))
         search_obj = make_jaccard_search_query(threshold=0.1)
-        new_result = {str(s) for s in tree.find(search_obj, to_search.data)}
+        new_result = {str(s.signature) for s in tree.find(search_obj, to_search.data)}
         print(*new_result, sep='\n')
 
         assert old_result == new_result
@@ -363,7 +363,7 @@ def test_sbt_zipstorage(tmpdir):
     print('*' * 60)
     print("{}:".format(to_search.metadata))
     search_obj = make_jaccard_search_query(threshold=0.1)
-    old_result = {str(s) for s in tree.find(search_obj, to_search.data)}
+    old_result = {str(s.signature) for s in tree.find(search_obj, to_search.data)}
     print(*old_result, sep='\n')
 
     with ZipStorage(str(tmpdir.join("tree.sbt.zip"))) as storage:
@@ -377,7 +377,7 @@ def test_sbt_zipstorage(tmpdir):
         print('*' * 60)
         print("{}:".format(to_search.metadata))
         search_obj = make_jaccard_search_query(threshold=0.1)
-        new_result = {str(s) for s in tree.find(search_obj, to_search.data)}
+        new_result = {str(s.signature) for s in tree.find(search_obj, to_search.data)}
         print(*new_result, sep='\n')
 
         assert old_result == new_result
@@ -400,7 +400,7 @@ def test_sbt_ipfsstorage():
         print('*' * 60)
         print("{}:".format(to_search.metadata))
         search_obj = make_jaccard_search_query(threshold=0.1)
-        old_result = {str(s) for s in tree.find(search_obj, to_search.data)}
+        old_result = {str(s.signature) for s in tree.find(search_obj, to_search.data)}
         print(*old_result, sep='\n')
 
         try:
@@ -417,7 +417,7 @@ def test_sbt_ipfsstorage():
             print('*' * 60)
             print("{}:".format(to_search.metadata))
             search_obj = make_jaccard_search_query(threshold=0.1)
-            new_result = {str(s) for s in tree.find(search_obj, to_search.data)}
+            new_result = {str(s.signature) for s in tree.find(search_obj, to_search.data)}
             print(*new_result, sep='\n')
 
             assert old_result == new_result
@@ -439,7 +439,7 @@ def test_sbt_redisstorage():
         print('*' * 60)
         print("{}:".format(to_search.metadata))
         search_obj = make_jaccard_search_query(threshold=0.1)
-        old_result = {str(s) for s in tree.find(search_obj, to_search.data)}
+        old_result = {str(s.signature) for s in tree.find(search_obj, to_search.data)}
         print(*old_result, sep='\n')
 
         try:
@@ -456,7 +456,7 @@ def test_sbt_redisstorage():
             print('*' * 60)
             print("{}:".format(to_search.metadata))
             search_obj = make_jaccard_search_query(threshold=0.1)
-            new_result = {str(s) for s in tree.find(search_obj, to_search.data)}
+            new_result = {str(s.signature) for s in tree.find(search_obj, to_search.data)}
             print(*new_result, sep='\n')
 
             assert old_result == new_result
@@ -483,8 +483,8 @@ def test_save_zip(tmpdir):
     print("*" * 60)
     print("{}:".format(to_search))
     search_obj = make_jaccard_search_query(threshold=0.1)
-    old_result = {str(s) for s in tree.find(search_obj, to_search)}
-    new_result = {str(s) for s in new_tree.find(search_obj, to_search)}
+    old_result = {str(s.signature) for s in tree.find(search_obj, to_search)}
+    new_result = {str(s.signature) for s in new_tree.find(search_obj, to_search)}
     print(*new_result, sep="\n")
 
     assert old_result == new_result
@@ -505,7 +505,7 @@ def test_load_zip(tmpdir):
     print("*" * 60)
     print("{}:".format(to_search))
     search_obj = make_jaccard_search_query(threshold=0.1)
-    new_result = {str(s) for s in tree.find(search_obj, to_search)}
+    new_result = {str(s.signature) for s in tree.find(search_obj, to_search)}
     print(*new_result, sep="\n")
     assert len(new_result) == 2
 
@@ -527,7 +527,7 @@ def test_load_zip_uncompressed(tmpdir):
     print("*" * 60)
     print("{}:".format(to_search))
     search_obj = make_jaccard_search_query(threshold=0.1)
-    new_result = {str(s) for s in tree.find(search_obj, to_search)}
+    new_result = {str(s.signature) for s in tree.find(search_obj, to_search)}
     print(*new_result, sep="\n")
     assert len(new_result) == 2
 
@@ -543,8 +543,8 @@ def test_tree_repair():
     to_search = load_one_signature(testdata1)
 
     search_obj = make_jaccard_search_query(threshold=0.1)
-    results_repair = {str(s) for s in tree_repair.find(search_obj, to_search)}
-    results_cur = {str(s) for s in tree_cur.find(search_obj, to_search)}
+    results_repair = {str(s.signature) for s in tree_repair.find(search_obj, to_search)}
+    results_cur = {str(s.signature) for s in tree_cur.find(search_obj, to_search)}
 
     assert results_repair == results_cur
     assert len(results_repair) == 2
@@ -584,7 +584,7 @@ def test_save_sparseness(n_children):
     print("{}:".format(to_search.metadata))
 
     search_obj = make_jaccard_search_query(threshold=0.1)
-    old_result = {str(s) for s in tree.find(search_obj, to_search.data)}
+    old_result = {str(s.signature) for s in tree.find(search_obj, to_search.data)}
     print(*old_result, sep='\n')
 
     with utils.TempDirectory() as location:
@@ -595,7 +595,7 @@ def test_save_sparseness(n_children):
 
         print('*' * 60)
         print("{}:".format(to_search.metadata))
-        new_result = {str(s) for s in tree_loaded.find(search_obj,
+        new_result = {str(s.signature) for s in tree_loaded.find(search_obj,
                                                        to_search.data)}
         print(*new_result, sep='\n')
 
@@ -675,7 +675,8 @@ def test_sbt_gather_threshold_1():
 
     # query with empty hashes
     assert not new_mh
-    assert not tree.gather(SourmashSignature(new_mh))
+    with pytest.raises(ValueError):
+        tree.gather(SourmashSignature(new_mh))
 
     # add one hash
     new_mh.add_hash(mins.pop())
@@ -689,8 +690,8 @@ def test_sbt_gather_threshold_1():
     assert name is None
 
     # check with a threshold -> should be no results.
-    results = tree.gather(SourmashSignature(new_mh), threshold_bp=5000)
-    assert not results
+    with pytest.raises(ValueError):
+        tree.gather(SourmashSignature(new_mh), threshold_bp=5000)
 
     # add three more hashes => length of 4
     new_mh.add_hash(mins.pop())
@@ -707,8 +708,8 @@ def test_sbt_gather_threshold_1():
 
     # check with a too-high threshold -> should be no results.
     print('len mh', len(new_mh))
-    results = tree.gather(SourmashSignature(new_mh), threshold_bp=5000)
-    assert not results
+    with pytest.raises(ValueError):
+        tree.gather(SourmashSignature(new_mh), threshold_bp=5000)
 
 
 def test_sbt_gather_threshold_5():

@@ -6,11 +6,13 @@ import glob
 import os
 import zipfile
 import shutil
+import copy
 
 import sourmash
 from sourmash import load_one_signature, SourmashSignature
 from sourmash.index import (LinearIndex, MultiIndex, ZipFileLinearIndex,
-                            make_jaccard_search_query)
+                            make_jaccard_search_query, CounterGather,
+                            LazyLinearIndex)
 from sourmash.sbt import SBT, GraphFactory, Leaf
 from sourmash.sbtmh import SigLeaf
 from sourmash import sourmash_args
@@ -124,6 +126,91 @@ def test_linear_index_search():
     assert len(sr) == 1
     sr.sort(key=lambda x: -x[0])
     assert sr[0][1] == ss63
+
+
+def test_linear_index_prefetch():
+    # prefetch does basic things right:
+    sig2 = utils.get_test_data('2.fa.sig')
+    sig47 = utils.get_test_data('47.fa.sig')
+    sig63 = utils.get_test_data('63.fa.sig')
+
+    ss2 = sourmash.load_one_signature(sig2, ksize=31)
+    ss47 = sourmash.load_one_signature(sig47)
+    ss63 = sourmash.load_one_signature(sig63)
+
+    lidx = LinearIndex()
+    lidx.insert(ss2)
+    lidx.insert(ss47)
+    lidx.insert(ss63)
+
+    # search for ss2
+    results = []
+    for result in lidx.prefetch(ss2, threshold_bp=0):
+        results.append(result)
+
+    assert len(results) == 1
+    assert results[0].signature == ss2
+
+    # search for ss47 - expect two results
+    results = []
+    for result in lidx.prefetch(ss47, threshold_bp=0):
+        results.append(result)
+
+    assert len(results) == 2
+    assert results[0].signature == ss47
+    assert results[1].signature == ss63
+
+
+def test_linear_index_prefetch_empty():
+    # check that an exception is raised upon for an empty database
+    sig2 = utils.get_test_data('2.fa.sig')
+    ss2 = sourmash.load_one_signature(sig2, ksize=31)
+
+    lidx = LinearIndex()
+
+    # since this is a generator, we need to actually ask for a value to
+    # get exception raised.
+    g = lidx.prefetch(ss2, threshold_bp=0)
+    with pytest.raises(ValueError) as e:
+        next(g)
+
+    assert "no signatures to search" in str(e.value)
+
+
+def test_linear_index_prefetch_lazy():
+    # make sure that prefetch doesn't touch values 'til requested.
+    class FakeSignature:
+        @property
+        def minhash(self):
+            raise Exception("don't touch me!")
+
+    sig47 = utils.get_test_data('47.fa.sig')
+    sig63 = utils.get_test_data('63.fa.sig')
+
+    ss47 = sourmash.load_one_signature(sig47)
+    ss63 = sourmash.load_one_signature(sig63)
+    fake = FakeSignature()
+
+    lidx = LinearIndex()
+    lidx.insert(ss47)
+    lidx.insert(ss63)
+    lidx.insert(fake)
+
+    g = lidx.prefetch(ss47, threshold_bp=0)
+
+    # first value:
+    sr = next(g)
+    assert sr.signature == ss47
+
+    # second value:
+    sr = next(g)
+    assert sr.signature == ss63
+
+    # third value: raises exception!
+    with pytest.raises(Exception) as e:
+        next(g)
+
+    assert "don't touch me!" in str(e.value)
 
 
 def test_linear_index_gather():
@@ -423,7 +510,8 @@ def test_linear_gather_threshold_1():
 
     # query with empty hashes
     assert not new_mh
-    assert not linear.gather(SourmashSignature(new_mh))
+    with pytest.raises(ValueError):
+        linear.gather(SourmashSignature(new_mh))
 
     # add one hash
     new_mh.add_hash(mins.pop())
@@ -437,8 +525,8 @@ def test_linear_gather_threshold_1():
     assert name is None
 
     # check with a threshold -> should be no results.
-    results = linear.gather(SourmashSignature(new_mh), threshold_bp=5000)
-    assert not results
+    with pytest.raises(ValueError):
+        linear.gather(SourmashSignature(new_mh), threshold_bp=5000)
 
     # add three more hashes => length of 4
     new_mh.add_hash(mins.pop())
@@ -454,8 +542,8 @@ def test_linear_gather_threshold_1():
     assert name is None
 
     # check with a too-high threshold -> should be no results.
-    results = linear.gather(SourmashSignature(new_mh), threshold_bp=5000)
-    assert not results
+    with pytest.raises(ValueError):
+        linear.gather(SourmashSignature(new_mh), threshold_bp=5000)
 
 
 def test_linear_gather_threshold_5():
@@ -673,6 +761,9 @@ def test_zipfile_dayhoff_command_search_protein(c):
     with pytest.raises(ValueError) as exc:
         c.run_sourmash('search', sigfile1, db_out, '--threshold', '0.0')
 
+    print(c.last_result.out)
+    print(c.last_result.err)
+
     assert 'no compatible signatures found in ' in c.last_result.err
 
 
@@ -684,6 +775,32 @@ def test_zipfile_API_signatures():
     siglist = list(zipidx.signatures())
     assert len(siglist) == 7
     assert len(zipidx) == 7
+
+
+def test_zipfile_bool():
+    # make sure that zipfile __bool__ doesn't traverse all the signatures
+    # by relying on __len__!
+
+    # create fake class that overrides everything useful except for bool -
+    class FakeZipFileLinearIndex(ZipFileLinearIndex):
+        def __init__(self):
+            pass
+
+        def signatures(self):
+            yield 'a'
+            raise Exception("don't touch me!")
+
+        def __len__(self):
+            raise Exception("don't call len!")
+
+    # 'bool' should not touch __len__ or a second signature
+    zf = FakeZipFileLinearIndex()
+    assert bool(zf)
+
+    # __len__ should raise an exception
+    with pytest.raises(Exception) as exc:
+        len(zf)
+    assert "don't call len!" in str(exc.value)
 
 
 def test_zipfile_API_signatures_traverse_yield_all():
@@ -869,13 +986,10 @@ def test_multi_index_gather():
     assert matches[0][2] == 'A'
 
     matches = lidx.gather(ss47)
-    assert len(matches) == 2
+    assert len(matches) == 1
     assert matches[0][0] == 1.0
     assert matches[0][1] == ss47
     assert matches[0][2] == sig47     # no source override
-    assert round(matches[1][0], 2) == 0.49
-    assert matches[1][1] == ss63
-    assert matches[1][2] == 'C'       # source override
 
 
 def test_multi_index_signatures():
@@ -1124,7 +1238,7 @@ def test_linear_index_gather_ignore():
     search_fn = JaccardSearchBestOnly_ButIgnore([ss47])
 
     results = list(lidx.find(search_fn, ss47))
-    results = [ ss for (ss, score) in results ]
+    results = [ sr.signature for sr in results ]
 
     def is_found(ss, xx):
         for q in xx:
@@ -1159,7 +1273,7 @@ def test_lca_index_gather_ignore():
     search_fn = JaccardSearchBestOnly_ButIgnore([ss47])
 
     results = list(db.find(search_fn, ss47))
-    results = [ ss for (ss, score) in results ]
+    results = [ sr.signature for sr in results ]
 
     def is_found(ss, xx):
         for q in xx:
@@ -1195,7 +1309,7 @@ def test_sbt_index_gather_ignore():
     search_fn = JaccardSearchBestOnly_ButIgnore([ss47])
 
     results = list(db.find(search_fn, ss47))
-    results = [ ss for (ss, score) in results ]
+    results = [ sr.signature for sr in results ]
 
     def is_found(ss, xx):
         for q in xx:
@@ -1207,3 +1321,730 @@ def test_sbt_index_gather_ignore():
     assert not is_found(ss47, results)
     assert not is_found(ss2, results)
     assert is_found(ss63, results)
+
+###
+### CounterGather tests
+###
+
+
+def _consume_all(query_mh, counter, threshold_bp=0):
+    results = []
+
+    last_intersect_size = None
+    while 1:
+        result = counter.peek(query_mh, threshold_bp)
+        if not result:
+            break
+
+        sr, intersect_mh = result
+        print(sr.signature.name, len(intersect_mh))
+        if last_intersect_size:
+            assert len(intersect_mh) <= last_intersect_size
+
+        last_intersect_size = len(intersect_mh)
+
+        counter.consume(intersect_mh)
+        query_mh.remove_many(intersect_mh.hashes)
+
+        results.append((sr, len(intersect_mh)))
+
+    return results
+
+
+def test_counter_gather_1():
+    # check a contrived set of non-overlapping gather results,
+    # generated via CounterGather
+    query_mh = sourmash.MinHash(n=0, ksize=31, scaled=1)
+    query_mh.add_many(range(0, 20))
+    query_ss = SourmashSignature(query_mh, name='query')
+
+    match_mh_1 = query_mh.copy_and_clear()
+    match_mh_1.add_many(range(0, 10))
+    match_ss_1 = SourmashSignature(match_mh_1, name='match1')
+
+    match_mh_2 = query_mh.copy_and_clear()
+    match_mh_2.add_many(range(10, 15))
+    match_ss_2 = SourmashSignature(match_mh_2, name='match2')
+
+    match_mh_3 = query_mh.copy_and_clear()
+    match_mh_3.add_many(range(15, 17))
+    match_ss_3 = SourmashSignature(match_mh_3, name='match3')
+
+    # load up the counter
+    counter = CounterGather(query_ss.minhash)
+    counter.add(match_ss_1)
+    counter.add(match_ss_2)
+    counter.add(match_ss_3)
+
+    results = _consume_all(query_ss.minhash, counter)
+
+    expected = (['match1', 10],
+                ['match2', 5],
+                ['match3', 2],)
+    assert len(results) == len(expected), results
+
+    for (sr, size), (exp_name, exp_size) in zip(results, expected):
+        sr_name = sr.signature.name.split()[0]
+
+        assert sr_name == exp_name
+        assert size == exp_size
+
+
+def test_counter_gather_1_b():
+    # check a contrived set of somewhat-overlapping gather results,
+    # generated via CounterGather. Here the overlaps are structured
+    # so that the gather results are the same as those in
+    # test_counter_gather_1(), even though the overlaps themselves are
+    # larger.
+    query_mh = sourmash.MinHash(n=0, ksize=31, scaled=1)
+    query_mh.add_many(range(0, 20))
+    query_ss = SourmashSignature(query_mh, name='query')
+
+    match_mh_1 = query_mh.copy_and_clear()
+    match_mh_1.add_many(range(0, 10))
+    match_ss_1 = SourmashSignature(match_mh_1, name='match1')
+
+    match_mh_2 = query_mh.copy_and_clear()
+    match_mh_2.add_many(range(7, 15))
+    match_ss_2 = SourmashSignature(match_mh_2, name='match2')
+
+    match_mh_3 = query_mh.copy_and_clear()
+    match_mh_3.add_many(range(13, 17))
+    match_ss_3 = SourmashSignature(match_mh_3, name='match3')
+
+    # load up the counter
+    counter = CounterGather(query_ss.minhash)
+    counter.add(match_ss_1)
+    counter.add(match_ss_2)
+    counter.add(match_ss_3)
+
+    results = _consume_all(query_ss.minhash, counter)
+
+    expected = (['match1', 10],
+                ['match2', 5],
+                ['match3', 2],)
+    assert len(results) == len(expected), results
+
+    for (sr, size), (exp_name, exp_size) in zip(results, expected):
+        sr_name = sr.signature.name.split()[0]
+
+        assert sr_name == exp_name
+        assert size == exp_size
+
+
+def test_counter_gather_1_c_with_threshold():
+    # check a contrived set of somewhat-overlapping gather results,
+    # generated via CounterGather. Here the overlaps are structured
+    # so that the gather results are the same as those in
+    # test_counter_gather_1(), even though the overlaps themselves are
+    # larger.
+    # use a threshold, here.
+
+    query_mh = sourmash.MinHash(n=0, ksize=31, scaled=1)
+    query_mh.add_many(range(0, 20))
+    query_ss = SourmashSignature(query_mh, name='query')
+
+    match_mh_1 = query_mh.copy_and_clear()
+    match_mh_1.add_many(range(0, 10))
+    match_ss_1 = SourmashSignature(match_mh_1, name='match1')
+
+    match_mh_2 = query_mh.copy_and_clear()
+    match_mh_2.add_many(range(7, 15))
+    match_ss_2 = SourmashSignature(match_mh_2, name='match2')
+
+    match_mh_3 = query_mh.copy_and_clear()
+    match_mh_3.add_many(range(13, 17))
+    match_ss_3 = SourmashSignature(match_mh_3, name='match3')
+
+    # load up the counter
+    counter = CounterGather(query_ss.minhash)
+    counter.add(match_ss_1)
+    counter.add(match_ss_2)
+    counter.add(match_ss_3)
+
+    results = _consume_all(query_ss.minhash, counter,
+                           threshold_bp=3)
+
+    expected = (['match1', 10],
+                ['match2', 5])
+    assert len(results) == len(expected), results
+
+    for (sr, size), (exp_name, exp_size) in zip(results, expected):
+        sr_name = sr.signature.name.split()[0]
+
+        assert sr_name == exp_name
+        assert size == exp_size
+
+
+def test_counter_gather_1_d_diff_scaled():
+    # test as above, but with different scaled.
+    query_mh = sourmash.MinHash(n=0, ksize=31, scaled=1)
+    query_mh.add_many(range(0, 20))
+    query_ss = SourmashSignature(query_mh, name='query')
+
+    match_mh_1 = query_mh.copy_and_clear().downsample(scaled=10)
+    match_mh_1.add_many(range(0, 10))
+    match_ss_1 = SourmashSignature(match_mh_1, name='match1')
+
+    match_mh_2 = query_mh.copy_and_clear().downsample(scaled=20)
+    match_mh_2.add_many(range(7, 15))
+    match_ss_2 = SourmashSignature(match_mh_2, name='match2')
+
+    match_mh_3 = query_mh.copy_and_clear().downsample(scaled=30)
+    match_mh_3.add_many(range(13, 17))
+    match_ss_3 = SourmashSignature(match_mh_3, name='match3')
+
+    # load up the counter
+    counter = CounterGather(query_ss.minhash)
+    counter.add(match_ss_1)
+    counter.add(match_ss_2)
+    counter.add(match_ss_3)
+
+    results = _consume_all(query_ss.minhash, counter)
+
+    expected = (['match1', 10],
+                ['match2', 5],
+                ['match3', 2],)
+    assert len(results) == len(expected), results
+
+    for (sr, size), (exp_name, exp_size) in zip(results, expected):
+        sr_name = sr.signature.name.split()[0]
+
+        assert sr_name == exp_name
+        assert size == exp_size
+
+
+def test_counter_gather_1_d_diff_scaled_query():
+    # test as above, but with different scaled for QUERY.
+    query_mh = sourmash.MinHash(n=0, ksize=31, scaled=1)
+    query_mh.add_many(range(0, 20))
+
+    match_mh_1 = query_mh.copy_and_clear().downsample(scaled=10)
+    match_mh_1.add_many(range(0, 10))
+    match_ss_1 = SourmashSignature(match_mh_1, name='match1')
+
+    match_mh_2 = query_mh.copy_and_clear().downsample(scaled=20)
+    match_mh_2.add_many(range(7, 15))
+    match_ss_2 = SourmashSignature(match_mh_2, name='match2')
+
+    match_mh_3 = query_mh.copy_and_clear().downsample(scaled=30)
+    match_mh_3.add_many(range(13, 17))
+    match_ss_3 = SourmashSignature(match_mh_3, name='match3')
+
+    # downsample query now -
+    query_ss = SourmashSignature(query_mh.downsample(scaled=100), name='query')
+
+    # load up the counter
+    counter = CounterGather(query_ss.minhash)
+    counter.add(match_ss_1)
+    counter.add(match_ss_2)
+    counter.add(match_ss_3)
+
+    results = _consume_all(query_ss.minhash, counter)
+
+    expected = (['match1', 10],
+                ['match2', 5],
+                ['match3', 2],)
+    assert len(results) == len(expected), results
+
+    for (sr, size), (exp_name, exp_size) in zip(results, expected):
+        sr_name = sr.signature.name.split()[0]
+
+        assert sr_name == exp_name
+        assert size == exp_size
+
+
+def test_counter_gather_1_e_abund_query():
+    # test as above, but abund query
+    query_mh = sourmash.MinHash(n=0, ksize=31, scaled=1, track_abundance=1)
+    query_mh.add_many(range(0, 20))
+    query_ss = SourmashSignature(query_mh, name='query')
+
+    match_mh_1 = query_mh.copy_and_clear().flatten()
+    match_mh_1.add_many(range(0, 10))
+    match_ss_1 = SourmashSignature(match_mh_1, name='match1')
+
+    match_mh_2 = query_mh.copy_and_clear().flatten()
+    match_mh_2.add_many(range(7, 15))
+    match_ss_2 = SourmashSignature(match_mh_2, name='match2')
+
+    match_mh_3 = query_mh.copy_and_clear().flatten()
+    match_mh_3.add_many(range(13, 17))
+    match_ss_3 = SourmashSignature(match_mh_3, name='match3')
+
+    # load up the counter
+    counter = CounterGather(query_ss.minhash)
+    counter.add(match_ss_1)
+    counter.add(match_ss_2)
+    counter.add(match_ss_3)
+
+    # must flatten before peek!
+    results = _consume_all(query_ss.minhash.flatten(), counter)
+
+    expected = (['match1', 10],
+                ['match2', 5],
+                ['match3', 2],)
+    assert len(results) == len(expected), results
+
+    for (sr, size), (exp_name, exp_size) in zip(results, expected):
+        sr_name = sr.signature.name.split()[0]
+
+        assert sr_name == exp_name
+        assert size == exp_size
+
+
+def test_counter_gather_1_f_abund_match():
+    # test as above, but abund query
+    query_mh = sourmash.MinHash(n=0, ksize=31, scaled=1, track_abundance=1)
+    query_mh.add_many(range(0, 20))
+    query_ss = SourmashSignature(query_mh.flatten(), name='query')
+
+    match_mh_1 = query_mh.copy_and_clear()
+    match_mh_1.add_many(range(0, 10))
+    match_ss_1 = SourmashSignature(match_mh_1, name='match1')
+
+    match_mh_2 = query_mh.copy_and_clear()
+    match_mh_2.add_many(range(7, 15))
+    match_ss_2 = SourmashSignature(match_mh_2, name='match2')
+
+    match_mh_3 = query_mh.copy_and_clear()
+    match_mh_3.add_many(range(13, 17))
+    match_ss_3 = SourmashSignature(match_mh_3, name='match3')
+
+    # load up the counter
+    counter = CounterGather(query_ss.minhash)
+    counter.add(match_ss_1)
+    counter.add(match_ss_2)
+    counter.add(match_ss_3)
+
+    # must flatten before peek!
+    results = _consume_all(query_ss.minhash.flatten(), counter)
+
+    expected = (['match1', 10],
+                ['match2', 5],
+                ['match3', 2],)
+    assert len(results) == len(expected), results
+
+    for (sr, size), (exp_name, exp_size) in zip(results, expected):
+        sr_name = sr.signature.name.split()[0]
+
+        assert sr_name == exp_name
+        assert size == exp_size
+
+
+def test_counter_gather_2():
+    # check basic set of gather results on semi-real data,
+    # generated via CounterGather
+    testdata_combined = utils.get_test_data('gather/combined.sig')
+    testdata_glob = utils.get_test_data('gather/GCF*.sig')
+    testdata_sigs = glob.glob(testdata_glob)
+
+    query_ss = sourmash.load_one_signature(testdata_combined, ksize=21)
+    subject_sigs = [ (sourmash.load_one_signature(t, ksize=21), t)
+                     for t in testdata_sigs ]
+
+    # load up the counter
+    counter = CounterGather(query_ss.minhash)
+    for ss, loc in subject_sigs:
+        counter.add(ss, loc)
+
+    results = _consume_all(query_ss.minhash, counter)
+
+    expected = (['NC_003198.1', 487],
+                ['NC_000853.1', 192],
+                ['NC_011978.1', 169],
+                ['NC_002163.1', 157],
+                ['NC_003197.2', 152],
+                ['NC_009486.1', 92],
+                ['NC_006905.1', 76],
+                ['NC_011080.1', 59],
+                ['NC_011274.1', 42],
+                ['NC_006511.1', 31],
+                ['NC_011294.1', 7],
+                ['NC_004631.1', 2])
+    assert len(results) == len(expected)
+
+    for (sr, size), (exp_name, exp_size) in zip(results, expected):
+        sr_name = sr.signature.name.split()[0]
+        print(sr_name, size)
+
+        assert sr_name == exp_name
+        assert size == exp_size
+
+
+def test_counter_gather_exact_match():
+    # query == match
+    query_mh = sourmash.MinHash(n=0, ksize=31, scaled=1)
+    query_mh.add_many(range(0, 20))
+    query_ss = SourmashSignature(query_mh, name='query')
+
+    # load up the counter
+    counter = CounterGather(query_ss.minhash)
+    counter.add(query_ss, 'somewhere over the rainbow')
+
+    results = _consume_all(query_ss.minhash, counter)
+    assert len(results) == 1
+    (sr, intersect_mh) = results[0]
+
+    assert sr.score == 1.0
+    assert sr.signature == query_ss
+    assert sr.location == 'somewhere over the rainbow'
+
+
+def test_counter_gather_add_after_peek():
+    # cannot add after peek or consume
+    query_mh = sourmash.MinHash(n=0, ksize=31, scaled=1)
+    query_mh.add_many(range(0, 20))
+    query_ss = SourmashSignature(query_mh, name='query')
+
+    # load up the counter
+    counter = CounterGather(query_ss.minhash)
+    counter.add(query_ss, 'somewhere over the rainbow')
+
+    counter.peek(query_ss.minhash)
+
+    with pytest.raises(ValueError):
+        counter.add(query_ss, "try again")
+
+
+def test_counter_gather_add_after_consume():
+    # cannot add after peek or consume
+    query_mh = sourmash.MinHash(n=0, ksize=31, scaled=1)
+    query_mh.add_many(range(0, 20))
+    query_ss = SourmashSignature(query_mh, name='query')
+
+    # load up the counter
+    counter = CounterGather(query_ss.minhash)
+    counter.add(query_ss, 'somewhere over the rainbow')
+
+    counter.consume(query_ss.minhash)
+
+    with pytest.raises(ValueError):
+        counter.add(query_ss, "try again")
+
+
+def test_counter_gather_consume_empty_intersect():
+    query_mh = sourmash.MinHash(n=0, ksize=31, scaled=1)
+    query_mh.add_many(range(0, 20))
+    query_ss = SourmashSignature(query_mh, name='query')
+
+    # load up the counter
+    counter = CounterGather(query_ss.minhash)
+    counter.add(query_ss, 'somewhere over the rainbow')
+
+    # nothing really happens here :laugh:, just making sure there's no error
+    counter.consume(query_ss.minhash.copy_and_clear())
+
+
+def test_counter_gather_empty_initial_query():
+    # check empty initial query
+    query_mh = sourmash.MinHash(n=0, ksize=31, scaled=1)
+    query_ss = SourmashSignature(query_mh, name='query')
+
+    match_mh_1 = query_mh.copy_and_clear()
+    match_mh_1.add_many(range(0, 10))
+    match_ss_1 = SourmashSignature(match_mh_1, name='match1')
+
+    # load up the counter
+    counter = CounterGather(query_ss.minhash)
+    counter.add(match_ss_1, require_overlap=False)
+
+    assert counter.peek(query_ss.minhash) == []
+
+
+def test_counter_gather_num_query():
+    # check num query
+    query_mh = sourmash.MinHash(n=500, ksize=31)
+    query_mh.add_many(range(0, 10))
+    query_ss = SourmashSignature(query_mh, name='query')
+
+    with pytest.raises(ValueError):
+        counter = CounterGather(query_ss.minhash)
+
+
+def test_counter_gather_empty_cur_query():
+    # test empty cur query
+    query_mh = sourmash.MinHash(n=0, ksize=31, scaled=1)
+    query_mh.add_many(range(0, 20))
+    query_ss = SourmashSignature(query_mh, name='query')
+
+    # load up the counter
+    counter = CounterGather(query_ss.minhash)
+    counter.add(query_ss, 'somewhere over the rainbow')
+
+    cur_query_mh = query_ss.minhash.copy_and_clear()
+    results = _consume_all(cur_query_mh, counter)
+    assert results == []
+
+
+def test_counter_gather_add_num_matchy():
+    # test add num query
+    query_mh = sourmash.MinHash(n=0, ksize=31, scaled=1)
+    query_mh.add_many(range(0, 20))
+    query_ss = SourmashSignature(query_mh, name='query')
+
+    match_mh = sourmash.MinHash(n=500, ksize=31)
+    match_mh.add_many(range(0, 20))
+    match_ss = SourmashSignature(match_mh, name='query')
+
+    # load up the counter
+    counter = CounterGather(query_ss.minhash)
+    with pytest.raises(ValueError):
+        counter.add(match_ss, 'somewhere over the rainbow')
+
+
+def test_counter_gather_bad_cur_query():
+    # test cur query that is not subset of original query
+    query_mh = sourmash.MinHash(n=0, ksize=31, scaled=1)
+    query_mh.add_many(range(0, 20))
+    query_ss = SourmashSignature(query_mh, name='query')
+
+    # load up the counter
+    counter = CounterGather(query_ss.minhash)
+    counter.add(query_ss, 'somewhere over the rainbow')
+
+    cur_query_mh = query_ss.minhash.copy_and_clear()
+    cur_query_mh.add_many(range(20, 30))
+    with pytest.raises(ValueError):
+        counter.peek(cur_query_mh)
+
+
+def test_counter_gather_add_no_overlap():
+    # check adding match with no overlap w/query
+    query_mh = sourmash.MinHash(n=0, ksize=31, scaled=1)
+    query_mh.add_many(range(0, 10))
+    query_ss = SourmashSignature(query_mh, name='query')
+
+    match_mh_1 = query_mh.copy_and_clear()
+    match_mh_1.add_many(range(10, 20))
+    match_ss_1 = SourmashSignature(match_mh_1, name='match1')
+
+    # load up the counter
+    counter = CounterGather(query_ss.minhash)
+    with pytest.raises(ValueError):
+        counter.add(match_ss_1)
+
+    assert counter.peek(query_ss.minhash) == []
+
+
+def test_counter_gather_big_threshold():
+    # check 'peek' with a huge threshold
+    query_mh = sourmash.MinHash(n=0, ksize=31, scaled=1)
+    query_mh.add_many(range(0, 20))
+    query_ss = SourmashSignature(query_mh, name='query')
+
+    match_mh_1 = query_mh.copy_and_clear()
+    match_mh_1.add_many(range(0, 10))
+    match_ss_1 = SourmashSignature(match_mh_1, name='match1')
+
+    # load up the counter
+    counter = CounterGather(query_ss.minhash)
+    counter.add(match_ss_1)
+
+    # impossible threshold:
+    threshold_bp=30*query_ss.minhash.scaled
+    results = counter.peek(query_ss.minhash, threshold_bp=threshold_bp)
+    assert results == []
+
+
+def test_counter_gather_empty_counter():
+    # check empty counter
+    query_mh = sourmash.MinHash(n=0, ksize=31, scaled=1)
+    query_ss = SourmashSignature(query_mh, name='query')
+
+    # empty counter!
+    counter = CounterGather(query_ss.minhash)
+
+    assert counter.peek(query_ss.minhash) == []
+
+
+def test_counter_gather_3_test_consume():
+    # open-box testing of consume(...)
+    query_mh = sourmash.MinHash(n=0, ksize=31, scaled=1)
+    query_mh.add_many(range(0, 20))
+    query_ss = SourmashSignature(query_mh, name='query')
+
+    match_mh_1 = query_mh.copy_and_clear()
+    match_mh_1.add_many(range(0, 10))
+    match_ss_1 = SourmashSignature(match_mh_1, name='match1')
+
+    match_mh_2 = query_mh.copy_and_clear()
+    match_mh_2.add_many(range(7, 15))
+    match_ss_2 = SourmashSignature(match_mh_2, name='match2')
+
+    match_mh_3 = query_mh.copy_and_clear()
+    match_mh_3.add_many(range(13, 17))
+    match_ss_3 = SourmashSignature(match_mh_3, name='match3')
+
+    # load up the counter
+    counter = CounterGather(query_ss.minhash)
+    counter.add(match_ss_1, 'loc a')
+    counter.add(match_ss_2, 'loc b')
+    counter.add(match_ss_3, 'loc c')
+
+    ### ok, dig into actual counts...
+    import pprint
+    pprint.pprint(counter.counter)
+    pprint.pprint(counter.siglist)
+    pprint.pprint(counter.locations)
+
+    assert counter.siglist == [ match_ss_1, match_ss_2, match_ss_3 ]
+    assert counter.locations == ['loc a', 'loc b', 'loc c']
+    assert list(counter.counter.items()) == [(0, 10), (1, 8), (2, 4)]
+
+    ## round 1
+
+    cur_query = copy.copy(query_ss.minhash)
+    (sr, intersect_mh) = counter.peek(cur_query)
+    assert sr.signature == match_ss_1
+    assert len(intersect_mh) == 10
+    assert cur_query == query_ss.minhash
+
+    counter.consume(intersect_mh)
+    assert counter.siglist == [ match_ss_1, match_ss_2, match_ss_3 ]
+    assert counter.locations == ['loc a', 'loc b', 'loc c']
+    assert list(counter.counter.items()) == [(1, 5), (2, 4)]
+
+    ### round 2
+
+    cur_query.remove_many(intersect_mh.hashes)
+    (sr, intersect_mh) = counter.peek(cur_query)
+    assert sr.signature == match_ss_2
+    assert len(intersect_mh) == 5
+    assert cur_query != query_ss.minhash
+
+    counter.consume(intersect_mh)
+    assert counter.siglist == [ match_ss_1, match_ss_2, match_ss_3 ]
+    assert counter.locations == ['loc a', 'loc b', 'loc c']
+    assert list(counter.counter.items()) == [(2, 2)]
+
+    ## round 3
+
+    cur_query.remove_many(intersect_mh.hashes)
+    (sr, intersect_mh) = counter.peek(cur_query)
+    assert sr.signature == match_ss_3
+    assert len(intersect_mh) == 2
+    assert cur_query != query_ss.minhash
+
+    counter.consume(intersect_mh)
+    assert counter.siglist == [ match_ss_1, match_ss_2, match_ss_3 ]
+    assert counter.locations == ['loc a', 'loc b', 'loc c']
+    assert list(counter.counter.items()) == []
+
+    ## round 4 - nothing left!
+
+    cur_query.remove_many(intersect_mh.hashes)
+    results = counter.peek(cur_query)
+    assert not results
+
+    counter.consume(intersect_mh)
+    assert counter.siglist == [ match_ss_1, match_ss_2, match_ss_3 ]
+    assert counter.locations == ['loc a', 'loc b', 'loc c']
+    assert list(counter.counter.items()) == []
+
+
+def test_lazy_index_1():
+    # test some basic features of LazyLinearIndex
+    sig2 = utils.get_test_data('2.fa.sig')
+    sig47 = utils.get_test_data('47.fa.sig')
+    sig63 = utils.get_test_data('63.fa.sig')
+
+    ss2 = sourmash.load_one_signature(sig2, ksize=31)
+    ss47 = sourmash.load_one_signature(sig47)
+    ss63 = sourmash.load_one_signature(sig63)
+
+    lidx = LinearIndex()
+    lidx.insert(ss2)
+    lidx.insert(ss47)
+    lidx.insert(ss63)
+
+    lazy = LazyLinearIndex(lidx)
+    lazy2 = lazy.select(ksize=31)
+    assert len(list(lazy2.signatures())) == 3
+
+    results = lazy2.search(ss2, threshold=1.0)
+    assert len(results) == 1
+    assert results[0].signature == ss2
+
+
+def test_lazy_index_2():
+    # test laziness by adding a signature that raises an exception when
+    # touched.
+
+    class FakeSignature:
+        @property
+        def minhash(self):
+            raise Exception("don't touch me!")
+
+    lidx = LinearIndex()
+    lidx.insert(FakeSignature())
+
+    lazy = LazyLinearIndex(lidx)
+    lazy2 = lazy.select(ksize=31)
+
+    sig_iter = lazy2.signatures()
+    with pytest.raises(Exception) as e:
+        list(sig_iter)
+
+    assert str(e.value) == "don't touch me!"
+
+
+def test_lazy_index_3():
+    # make sure that you can't do multiple _incompatible_ selects.
+    class FakeSignature:
+        @property
+        def minhash(self):
+            raise Exception("don't touch me!")
+
+    lidx = LinearIndex()
+    lidx.insert(FakeSignature())
+
+    lazy = LazyLinearIndex(lidx)
+    lazy2 = lazy.select(ksize=31)
+    with pytest.raises(ValueError) as e:
+        lazy3 = lazy2.select(ksize=21)
+
+    assert str(e.value) == "cannot select on two different values for ksize"
+
+
+def test_lazy_index_4_bool():
+    # test some basic features of LazyLinearIndex
+    sig2 = utils.get_test_data('2.fa.sig')
+    ss2 = sourmash.load_one_signature(sig2, ksize=31)
+
+    # test bool false/true
+    lidx = LinearIndex()
+    lazy = LazyLinearIndex(lidx)
+    assert not lazy
+
+    lidx.insert(ss2)
+    assert lazy
+
+
+def test_lazy_index_5_len():
+    # test some basic features of LazyLinearIndex
+    lidx = LinearIndex()
+    lazy = LazyLinearIndex(lidx)
+
+    with pytest.raises(NotImplementedError):
+        len(lazy)
+
+
+def test_lazy_index_wraps_multiindex_location():
+    sigdir = utils.get_test_data('prot/protein/')
+    sigzip = utils.get_test_data('prot/protein.zip')
+    siglca = utils.get_test_data('prot/protein.lca.json.gz')
+    sigsbt = utils.get_test_data('prot/protein.sbt.zip')
+
+    db_paths = (sigdir, sigzip, siglca, sigsbt)
+    dbs = [ sourmash.load_file_as_index(db_path) for db_path in db_paths ]
+
+    mi = MultiIndex(dbs, db_paths)
+    lazy = LazyLinearIndex(mi)
+
+    mi2 = mi.select(moltype='protein')
+    lazy2 = lazy.select(moltype='protein')
+
+    for (ss_tup, ss_lazy_tup) in zip(mi2.signatures_with_location(),
+                                     lazy2.signatures_with_location()):
+        assert ss_tup == ss_lazy_tup

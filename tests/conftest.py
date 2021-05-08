@@ -40,6 +40,16 @@ def n_children(request):
     return request.param
 
 
+@pytest.fixture(params=["--linear", "--no-linear"])
+def linear_gather(request):
+    return request.param
+
+
+@pytest.fixture(params=["--prefetch", "--no-prefetch"])
+def prefetch_gather(request):
+    return request.param
+
+
 # --- BEGIN - Only run tests using a particular fixture --- #
 # Cribbed from: http://pythontesting.net/framework/pytest/pytest-run-tests-using-particular-fixture/
 def pytest_collection_modifyitems(items, config):

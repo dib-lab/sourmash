@@ -8,7 +8,7 @@ import functools
 import sourmash
 from sourmash.minhash import _get_max_hash_for_scaled
 from sourmash.logging import notify, error, debug
-from sourmash.index import Index
+from sourmash.index import Index, IndexSearchResult
 
 
 def cached_property(fun):
@@ -478,7 +478,7 @@ class LCA_Database(Index):
             # signal that it is done, or something.
             if search_fn.passes(score):
                 if search_fn.collect(score, subj):
-                    yield subj, score
+                    yield IndexSearchResult(score, subj, self.location)
 
     @cached_property
     def lid_to_idx(self):

@@ -57,9 +57,9 @@ species, while the third is from a completely different genus.
 
 To get a list of subcommands, run `sourmash` without any arguments.
 
-There are six main subcommands: `sketch`, `compare`, `plot`,
-`search`, `gather`, and `index`.  See [the tutorial](tutorials.md) for a
-walkthrough of these commands.
+There are seven main subcommands: `sketch`, `compare`, `plot`,
+`search`, `gather`, `index`, and `prefetch`.  See
+[the tutorial](tutorials.md) for a walkthrough of these commands.
 
 * `sketch` creates signatures.
 * `compare` compares signatures and builds a distance matrix.
@@ -67,6 +67,7 @@ walkthrough of these commands.
 * `search` finds matches to a query signature in a collection of signatures.
 * `gather` finds the best reference genomes for a metagenome, using the provided collection of signatures.
 * `index` builds a fast index for many (thousands) of signatures.
+* `prefetch` selects signatures of interest from a very large collection of signatures, for later processing.
 
 There are also a number of commands that work with taxonomic
 information; these are grouped under the `sourmash lca`
@@ -295,6 +296,29 @@ genomes with no (or incomplete) taxonomic information.  Use `sourmash
 lca summarize` to classify a metagenome using a collection of genomes
 with taxonomic information.
 
+### Alternative search mode for low-memory (but slow) search: `--linear`
+
+By default, `sourmash gather` uses all information available for
+faster search. In particular, for SBTs, `prefetch` will prune the search
+tree.  This can be slow and/or memory intensive for very large databases,
+and `--linear` asks `sourmash prefetch` to instead use a linear search
+across all leaf nodes in the tree.
+
+The results are the same whether `--no-linear` or `--linear` is
+used.
+
+### Alternative search mode: `--no-prefetch`
+
+By default, `sourmash gather` does a "prefetch" to find *all* candidate
+signatures across all databases, before removing overlaps between the
+candidates. In rare circumstances, depending on the databases and parameters
+used, this may be slower or more memory intensive than doing iterative
+overlap removal. Prefetch behavior can be turned off with `--no-prefetch`.
+
+The results are the same whether `--prefetch` or `--no-prefetch` is
+used.  This option can be used with or without `--linear` (although
+`--no-prefetch --linear` will generally be MUCH slower).
+
 ### `sourmash index` - build an SBT index of signatures
 
 The `sourmash index` command creates a Zipped SBT database
@@ -305,11 +329,11 @@ used to create databases for e.g. subsets of GenBank.
 These databases support fast search and gather on large collections
 of signatures in low memory.
 
-SBTs can only be created on scaled signatures, and all signatures in
+All signatures in
 an SBT must be of compatible types (i.e. the same k-mer size and
 molecule type). You can specify the usual command line selectors
 (`-k`, `--scaled`, `--dna`, `--protein`, etc.) to pick out the types
-of signatures to include.
+of signatures to include when running `index`.
 
 Usage:
 ```
@@ -325,6 +349,58 @@ Note that you can use `--from-file` to pass `index` a text file
 containing a list of file names to index; you can also provide individual
 signature files, directories full of signatures, or other sourmash
 databases.
+
+### `sourmash prefetch` - select subsets of very large databases for more processing
+
+The `prefetch` subcommand searches a collection of scaled signatures
+for matches in a large database, using containment. It is similar to
+`search --containment`, while taking a `--threshold-bp` argument like
+`gather` does for thresholding matches (instead of using Jaccard
+similarity or containment).
+
+`sourmash prefetch` is intended to select a subset of a large database
+for further processing. As such, it can search very large collections
+of signatures (potentially millions or more), operates in very low
+memory (see `--linear` option, below), and does no post-processing of signatures.
+
+`prefetch` has four main output options, which can all be used individually
+or together:
+* `-o/--output` produces a CSV summary file;
+* `--save-matches` saves all matching signatures;
+* `-save-matching-hashes` saves a single signature containing all of the hashes that matched any signature in the database at or above the specified threshold;
+* `--save-unmatched-hashes` saves a single signature containing the complement of `--save-matching-hashes`.
+
+Other options include:
+* the usual `-k/--ksize` and `--dna`/`--protein`/`--dayhoff`/`--hp` signature selectors;
+* `--threshold-bp` to require a minimum estimated bp overlap for output;
+* `--scaled` for downsampling;
+* `--force` to continue past survivable errors;
+
+### Alternative search mode for low-memory (but slow) search: `--linear`
+
+By default, `sourmash prefetch` uses all information available for
+faster search. In particular, for SBTs, `prefetch` will prune the search
+tree.  This can be slow and/or memory intensive for very large databases,
+and `--linear` asks `sourmash prefetch` to instead use a linear search
+across all leaf nodes in the tree.
+
+### Caveats and comments
+
+`sourmash prefetch` provides no guarantees on output order. It runs in
+"streaming mode" on its inputs, in that each input file is loaded,
+searched, and then unloaded.  And `sourmash prefetch` can be run
+separately on multiple databases, after which the results can be
+searched in combination with `search`, `gather`, `compare`, etc.
+
+A motivating use case for `sourmash prefetch` is to run it on multiple
+large databases with a metagenome query using `--threshold-bp=0`,
+`--save-matching-hashes matching_hashes.sig`, and `--save-matches
+db-matches.sig`, and then run `sourmash gather matching-hashes.sig
+db-matches.sig`. 
+
+This combination of commands ensures that the more time- and
+memory-intensive `gather` step is run only on a small set of relevant
+signatures, rather than all the signatures in the database.
 
 ## `sourmash lca` subcommands for taxonomic classification
 

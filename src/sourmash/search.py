@@ -43,14 +43,14 @@ def make_jaccard_search_query(*,
     return search_obj
 
 
-def make_gather_query(query_mh, threshold_bp):
+def make_gather_query(query_mh, threshold_bp, *, best_only=True):
     "Make a search object for gather."
+    if not query_mh:
+        raise ValueError("query is empty!?")
+
     scaled = query_mh.scaled
     if not scaled:
         raise TypeError("query signature must be calculated with scaled")
-
-    if not query_mh:
-        return None
 
     # are we setting a threshold?
     threshold = 0
@@ -67,10 +67,14 @@ def make_gather_query(query_mh, threshold_bp):
 
         # is it too high to ever match? if so, exit.
         if threshold > 1.0:
-            return None
+            raise ValueError("requested threshold_bp is unattainable with this query")
 
-    search_obj = JaccardSearchBestOnly(SearchType.CONTAINMENT,
-                                       threshold=threshold)
+    if best_only:
+        search_obj = JaccardSearchBestOnly(SearchType.CONTAINMENT,
+                                           threshold=threshold)
+    else:
+        search_obj = JaccardSearch(SearchType.CONTAINMENT,
+                                   threshold=threshold)
 
     return search_obj
 
@@ -250,36 +254,33 @@ def _subtract_and_downsample(to_remove, old_query, scaled=None):
     return SourmashSignature(mh)
 
 
-def _find_best(dblist, query, threshold_bp):
+def _find_best(counters, query, threshold_bp):
     """
     Search for the best containment, return precisely one match.
     """
+    results = []
 
-    best_cont = 0.0
-    best_match = None
-    best_filename = None
+    best_result = None
+    best_intersect_mh = None
 
-    # quantize threshold_bp to be an integer multiple of scaled
-    query_scaled = query.minhash.scaled
-    threshold_bp = int(threshold_bp / query_scaled) * query_scaled
+    # find the best score across multiple counters, without consuming
+    for counter in counters:
+        result = counter.peek(query.minhash, threshold_bp)
+        if result:
+            (sr, intersect_mh) = result
 
-    # search across all databases
-    for db in dblist:
-        for cont, match, fname in db.gather(query, threshold_bp=threshold_bp):
-            assert cont                   # all matches should be nonzero.
+            if best_result is None or sr.score > best_result.score:
+                best_result = sr
+                best_intersect_mh = intersect_mh
 
-            # note, break ties based on name, to ensure consistent order.
-            if (cont == best_cont and str(match) < str(best_match)) or \
-               cont > best_cont:
-                # update best match.
-                best_cont = cont
-                best_match = match
-                best_filename = fname
+    if best_result:
+        # remove the best result from each counter
+        for counter in counters:
+            counter.consume(best_intersect_mh)
 
-    if not best_match:
-        return None, None, None
-
-    return best_cont, best_match, best_filename
+        # and done!
+        return best_result
+    return None
 
 
 def _filter_max_hash(values, max_hash):
@@ -290,9 +291,9 @@ def _filter_max_hash(values, max_hash):
     return results
 
 
-def gather_databases(query, databases, threshold_bp, ignore_abundance):
+def gather_databases(query, counters, threshold_bp, ignore_abundance):
     """
-    Iteratively find the best containment of `query` in all the `databases`,
+    Iteratively find the best containment of `query` in all the `counters`,
     until we find fewer than `threshold_bp` (estimated) bp in common.
     """
     # track original query information for later usage.
@@ -312,11 +313,14 @@ def gather_databases(query, databases, threshold_bp, ignore_abundance):
     result_n = 0
     while query.minhash:
         # find the best match!
-        best_cont, best_match, filename = _find_best(databases, query,
-                                                     threshold_bp)
-        if not best_match:          # no matches at all for this cutoff!
+        best_result = _find_best(counters, query, threshold_bp)
+
+        if not best_result:          # no matches at all for this cutoff!
             notify(f'found less than {format_bp(threshold_bp)} in common. => exiting')
             break
+
+        best_match = best_result.signature
+        filename = best_result.location
 
         # subtract found hashes from search hashes, construct new search
         query_hashes = set(query.minhash.hashes)
@@ -324,10 +328,7 @@ def gather_databases(query, databases, threshold_bp, ignore_abundance):
 
         # Is the best match computed with scaled? Die if not.
         match_scaled = best_match.minhash.scaled
-        if not match_scaled:
-            error('Best match in gather is not scaled.')
-            error('Please prepare gather databases with --scaled')
-            raise Exception
+        assert match_scaled
 
         # pick the highest scaled / lowest resolution
         cmp_scaled = max(cmp_scaled, match_scaled)
@@ -403,3 +404,59 @@ def gather_databases(query, databases, threshold_bp, ignore_abundance):
         result_n += 1
 
         yield result, weighted_missed, new_max_hash, query
+
+
+###
+### prefetch code
+###
+
+PrefetchResult = namedtuple('PrefetchResult',
+                            'intersect_bp, jaccard, max_containment, f_query_match, f_match_query, match, match_filename, match_name, match_md5, match_bp, query, query_filename, query_name, query_md5, query_bp')
+
+
+def prefetch_database(query, database, threshold_bp):
+    """
+    Find all matches to `query_mh` >= `threshold_bp` in `database`.
+    """
+    query_mh = query.minhash
+    scaled = query_mh.scaled
+    assert scaled
+
+    # for testing/double-checking purposes, calculate expected threshold -
+    threshold = threshold_bp / scaled
+
+    # iterate over all signatures in database, find matches
+
+    for result in database.prefetch(query, threshold_bp):
+        # base intersections on downsampled minhashes
+        match = result.signature
+        db_mh = match.minhash.flatten().downsample(scaled=scaled)
+
+        # calculate db match intersection with query hashes:
+        intersect_mh = query_mh.intersection(db_mh)
+        assert len(intersect_mh) >= threshold
+
+        f_query_match = db_mh.contained_by(query_mh)
+        f_match_query = query_mh.contained_by(db_mh)
+        max_containment = max(f_query_match, f_match_query)
+
+        # build a result namedtuple
+        result = PrefetchResult(
+            intersect_bp=len(intersect_mh) * scaled,
+            query_bp = len(query_mh) * scaled,
+            match_bp = len(db_mh) * scaled,
+            jaccard=db_mh.jaccard(query_mh),
+            max_containment=max_containment,
+            f_query_match=f_query_match,
+            f_match_query=f_match_query,
+            match=match,
+            match_filename=match.filename,
+            match_name=match.name,
+            match_md5=match.md5sum()[:8],
+            query=query,
+            query_filename=query.filename,
+            query_name=query.name,
+            query_md5=query.md5sum()[:8]
+        )
+
+        yield result

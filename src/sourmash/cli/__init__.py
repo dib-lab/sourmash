@@ -26,6 +26,7 @@ from . import index
 from . import migrate
 from . import multigather
 from . import plot
+from . import prefetch
 from . import sbt_combine
 from . import search
 from . import watch
