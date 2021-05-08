@@ -1588,27 +1588,18 @@ def test_import_export_2(c):
     assert imported.minhash == compare.minhash
 
 
-def test_import_mash_csv_to_sig():
+def test_import_mash_csv_to_sig(runtmp):
     # test copied over from 'sourmash import_csv'.
-    with utils.TempDirectory() as location:
-        testdata1 = utils.get_test_data('short.fa.msh.dump')
-        testdata2 = utils.get_test_data('short.fa')
+    testdata1 = utils.get_test_data('short.fa.msh.dump')
+    testdata2 = utils.get_test_data('short.fa')
 
-        status, out, err = utils.runscript('sourmash', ['sig', 'import',
-                                                        '--csv',
-                                                        testdata1,
-                                                        '-o', 'xxx.sig'],
-                                           in_directory=location)
+    runtmp.sourmash('sig', 'import', '--csv', testdata1, '-o', 'xxx.sig')
 
-        status, out, err = utils.runscript('sourmash',
-                                           ['compute', '-k', '31',
-                                            '-n', '970', testdata2],
-                                           in_directory=location)
+    runtmp.sourmash('compute', '-k', '31', '-n', '970', testdata2)
 
-        status, out, err = utils.runscript('sourmash',
-                                           ['search', '-k', '31',
-                                            'short.fa.sig', 'xxx.sig'],
-                                           in_directory=location)
-        print(status, out, err)
-        assert '1 matches:' in out
-        assert '100.0%       short.fa' in out
+    runtmp.sourmash('search', '-k', '31', 'short.fa.sig', 'xxx.sig')
+
+    print("RUNTEMP", runtmp)
+
+    assert '1 matches:' in runtmp.last_result.out
+    assert '100.0%       short.fa' in runtmp.last_result.out
