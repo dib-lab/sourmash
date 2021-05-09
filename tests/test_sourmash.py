@@ -26,6 +26,7 @@ except ImportError:
 
 from sourmash import signature
 from sourmash import VERSION
+from sourmash.sourmash_args import load_pathlist_from_file
 
 
 def test_run_sourmash():
@@ -70,6 +71,57 @@ def test_sourmash_info_verbose():
     assert "khmer version" in err
     assert "screed version" in err
     assert "loaded from path" in err
+
+
+def test_load_pathlist_from_file_does_not_exist():
+    from sourmash.sourmash_args import load_pathlist_from_file
+    with pytest.raises(ValueError) as e:
+        load_pathlist_from_file("")
+    assert "file '' does not exist" in str(e.value)
+
+
+@utils.in_tempdir
+def test_load_pathlist_from_file_empty(c):
+    file_list = c.output("file_list")
+    with open(file_list, "w") as fp:
+        fp.write("")
+    with pytest.raises(ValueError) as e:
+        load_pathlist_from_file(file_list)
+    assert "pathlist is empty" in str(e.value)
+
+
+@utils.in_tempdir
+def test_load_pathlist_from_file_badly_formatted(c):
+    file_list = c.output("file_list")
+    with open(file_list, "w") as fp:
+        fp.write("{'a':1}")
+    with pytest.raises(ValueError) as e:
+        load_pathlist_from_file(file_list)
+    assert "pathlist contains a badly formatted file" in str(e.value)
+    
+
+@utils.in_tempdir
+def test_load_pathlist_from_file_badly_formatted_2(c):
+    file_list = c.output("file_list")
+    sig1 = utils.get_test_data('compare/genome-s10.fa.gz.sig')
+    with open(file_list, "w") as fp:
+        fp.write(sig1 + "\n")
+        fp.write("{'a':1}")
+    with pytest.raises(ValueError) as e:
+        load_pathlist_from_file(file_list)
+    assert "pathlist contains a badly formatted file" in str(e.value)
+
+
+@utils.in_tempdir
+def test_load_pathlist_from_file_duplicate(c):
+    file_list = c.output("file_list")
+    sig1 = utils.get_test_data('compare/genome-s10.fa.gz.sig')
+    with open(file_list, "w") as fp:
+        fp.write(sig1 + "\n")
+        fp.write(sig1 + "\n")
+    check = load_pathlist_from_file(file_list)
+    print (check)
+    assert len(check) == 1
 
 
 @utils.in_tempdir
@@ -199,7 +251,6 @@ def test_do_compare_quiet(c):
     testdata1 = utils.get_test_data('short.fa')
     testdata2 = utils.get_test_data('short2.fa')
     c.run_sourmash('compute', '-k', '31', testdata1, testdata2)
-
     c.run_sourmash('compare', 'short.fa.sig',
                    'short2.fa.sig', '--csv', 'xxx', '-q')
     assert not c.last_result.out
@@ -236,7 +287,6 @@ def test_do_compare_output_csv(c):
     testdata1 = utils.get_test_data('short.fa')
     testdata2 = utils.get_test_data('short2.fa')
     c.run_sourmash('compute', '-k', '31', testdata1, testdata2)
-
     c.run_sourmash('compare', 'short.fa.sig', 'short2.fa.sig', '--csv', 'xxx')
 
     with open(c.output('xxx')) as fp:
