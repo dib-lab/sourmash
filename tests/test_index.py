@@ -1330,6 +1330,8 @@ def test_sbt_index_gather_ignore():
 def _consume_all(query_mh, counter, threshold_bp=0):
     results = []
 
+    query_mh = query_mh.mutable()
+
     last_intersect_size = None
     while 1:
         result = counter.peek(query_mh, threshold_bp)
@@ -1894,7 +1896,7 @@ def test_counter_gather_3_test_consume():
 
     ## round 1
 
-    cur_query = copy.copy(query_ss.minhash)
+    cur_query = copy.copy(query_ss.minhash).mutable()
     (sr, intersect_mh) = counter.peek(cur_query)
     assert sr.signature == match_ss_1
     assert len(intersect_mh) == 10

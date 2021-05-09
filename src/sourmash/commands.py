@@ -1104,7 +1104,7 @@ def prefetch(args):
 
     # iterate over signatures in db one at a time, for each db;
     # find those with sufficient overlap
-    noident_mh = copy.copy(query_mh)
+    noident_mh = copy.copy(query_mh).mutable()
     did_a_search = False        # track whether we did _any_ search at all!
     for dbfilename in args.databases:
         notify(f"loading signatures from '{dbfilename}'")
@@ -1162,7 +1162,7 @@ def prefetch(args):
         notify(f"saved {matches_out.count} matches to CSV file '{args.output}'")
         csvout_fp.close()
 
-    matched_query_mh = copy.copy(query_mh)
+    matched_query_mh = copy.copy(query_mh).mutable()
     matched_query_mh.remove_many(noident_mh.hashes)
     notify(f"of {len(query_mh)} distinct query hashes, {len(matched_query_mh)} were found in matches above threshold.")
     notify(f"a total of {len(noident_mh)} query hashes remain unmatched.")

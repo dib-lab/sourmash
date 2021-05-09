@@ -247,7 +247,7 @@ GatherResult = namedtuple('GatherResult',
 
 # build a new query object, subtracting found mins and downsampling
 def _subtract_and_downsample(to_remove, old_query, scaled=None):
-    mh = old_query.minhash
+    mh = old_query.minhash.mutable()
     mh = mh.downsample(scaled=scaled)
     mh.remove_many(to_remove)
 

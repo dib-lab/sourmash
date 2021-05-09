@@ -588,7 +588,7 @@ class MinHash(RustObject):
             if self.num != other.num:
                 raise TypeError(f"incompatible num values: self={self.num} other={other.num}")
 
-        new_obj = self.__copy__()
+        new_obj = self.mutable()
         new_obj += other
         return new_obj
 
@@ -645,3 +645,100 @@ class MinHash(RustObject):
             return 'hp'
         else:
             return 'DNA'
+
+    def mutable(self):
+        return self.__copy__()
+
+    def frozen(self):
+        new_mh = self.__copy__()
+        new_mh.__class__ = FrozenMinHash
+        return new_mh
+
+
+class FrozenMinHash(MinHash):
+    def add_sequence(self, *args, **kwargs):
+        raise TypeError('FrozenMinHash does not support modification')
+
+    def add_kmer(self, *args, **kwargs):
+        raise TypeError('FrozenMinHash does not support modification')
+
+    def add_many(self, *args, **kwargs):
+        raise TypeError('FrozenMinHash does not support modification')
+
+    def remove_many(self, *args, **kwargs):
+        raise TypeError('FrozenMinHash does not support modification')
+
+    def add_hash(self, *args, **kwargs):
+        raise TypeError('FrozenMinHash does not support modification')
+
+    def add_hash_with_abundance(self, *args, **kwargs):
+        raise TypeError('FrozenMinHash does not support modification')
+
+    def clear(self, *args, **kwargs):
+        raise TypeError('FrozenMinHash does not support modification')
+
+    def remove_many(self, *args, **kwargs):
+        raise TypeError('FrozenMinHash does not support modification')
+
+    def set_abundances(self, *args, **kwargs):
+        raise TypeError('FrozenMinHash does not support modification')
+
+    def add_protein(self, *args, **kwargs):
+        raise TypeError('FrozenMinHash does not support modification')
+
+    def downsample(self, *, num=None, scaled=None):
+        if scaled and self.scaled == scaled:
+            return self
+        if num and self.num == num:
+            return self
+
+        return MinHash.downsample(self, num=num, scaled=scaled).frozen()
+
+    def flatten(self):
+        if not self.track_abundance:
+            return self
+        return MinHash.flatten(self).frozen()
+
+    def __iadd__(self, *args, **kwargs):
+        raise TypeError('FrozenMinHash does not support modification')
+
+    def merge(self, *args, **kwargs):
+        raise TypeError('FrozenMinHash does not support modification')
+
+    def mutable(self):
+        mut = MinHash.__new__(MinHash)
+        state_tup = self.__getstate__()
+
+        # is protein/hp/dayhoff?
+        if state_tup[2] or state_tup[3] or state_tup[4]:
+            state_tup = list(state_tup)
+            # adjust ksize.
+            state_tup[1] = state_tup[1] * 3
+        mut.__setstate__(state_tup)
+        return mut
+
+    def __setstate__(self, tup):
+        "support pickling via __getstate__/__setstate__"
+        (n, ksize, is_protein, dayhoff, hp, mins, _, track_abundance,
+         max_hash, seed) = tup
+
+        self.__del__()
+
+        hash_function = (
+            lib.HASH_FUNCTIONS_MURMUR64_DAYHOFF if dayhoff else
+            lib.HASH_FUNCTIONS_MURMUR64_HP if hp else
+            lib.HASH_FUNCTIONS_MURMUR64_PROTEIN if is_protein else
+            lib.HASH_FUNCTIONS_MURMUR64_DNA
+        )
+
+        scaled = _get_scaled_for_max_hash(max_hash)
+        self._objptr = lib.kmerminhash_new(
+            scaled, ksize, hash_function, seed, track_abundance, n
+        )
+        if track_abundance:
+            MinHash.set_abundances(self, mins)
+        else:
+            MinHash.add_many(self, mins)
+
+    def __copy__(self):
+        return self

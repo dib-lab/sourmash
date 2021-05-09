@@ -3102,7 +3102,7 @@ def test_gather_f_match_orig(runtmp, linear_gather, prefetch_gather):
     print(runtmp.last_result.err)
 
     combined_sig = sourmash.load_one_signature(testdata_combined, ksize=21)
-    remaining_mh = copy.copy(combined_sig.minhash)
+    remaining_mh = combined_sig.minhash.mutable()
 
     def approx_equal(a, b, n=5):
         return round(a, n) == round(b, n)

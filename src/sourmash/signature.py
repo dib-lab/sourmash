@@ -9,7 +9,7 @@ from enum import Enum
 
 from .logging import error
 from . import MinHash
-from .minhash import to_bytes
+from .minhash import to_bytes, FrozenMinHash
 from ._lowlevel import ffi, lib
 from .utils import RustObject, rustcall, decode_str
 
@@ -42,7 +42,7 @@ class SourmashSignature(RustObject):
 
     @property
     def minhash(self):
-        return MinHash._from_objptr(
+        return FrozenMinHash._from_objptr(
             self._methodcall(lib.signature_first_mh)
         )
 

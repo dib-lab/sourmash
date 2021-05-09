@@ -42,6 +42,7 @@ import pytest
 import sourmash
 from sourmash.minhash import (
     MinHash,
+    FrozenMinHash,
     hash_murmur,
     _get_scaled_for_max_hash,
     _get_max_hash_for_scaled,
@@ -1908,3 +1909,39 @@ def test_max_containment_equal():
     assert mh2.contained_by(mh1) == 1
     assert mh1.max_containment(mh2) == 1
     assert mh2.max_containment(mh1) == 1
+
+
+def test_frozen_and_mutable_1(track_abundance):
+    # mutable minhashes -> mutable minhashes creates new copy
+    mh1 = MinHash(0, 21, scaled=1, track_abundance=track_abundance)
+    mh2 = mh1.mutable()
+
+    mh1.add_hash(10)
+    assert 10 not in mh2.hashes
+
+
+def test_frozen_and_mutable_2(track_abundance):
+    # check that mutable -> frozen are separate
+    mh1 = MinHash(0, 21, scaled=1, track_abundance=track_abundance)
+    mh1.add_hash(10)
+
+    mh2 = mh1.frozen()
+    assert 10 in mh2.hashes
+    mh1.add_hash(11)
+    assert 11 not in mh2.hashes
+
+
+def test_frozen_and_mutable_3(track_abundance):
+    # check that mutable -> frozen -> mutable are all separate from each other
+    mh1 = MinHash(0, 21, scaled=1, track_abundance=track_abundance)
+    mh1.add_hash(10)
+
+    mh2 = mh1.frozen()
+    assert 10 in mh2.hashes
+    mh1.add_hash(11)
+    assert 11 not in mh2.hashes
+
+    mh3 = mh2.mutable()
+    mh3.add_hash(12)
+    assert 12 not in mh2.hashes
+    assert 12 not in mh1.hashes

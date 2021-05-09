@@ -295,7 +295,7 @@ def test_prefetch_nomatch_hashes(runtmp, linear_gather):
     ss47 = sourmash.load_one_signature(sig47, ksize=31)
     ss63 = sourmash.load_one_signature(sig63, ksize=31)
 
-    remain = ss47.minhash
+    remain = ss47.minhash.mutable()
     remain.remove_many(ss63.minhash.hashes)
 
     ss = sourmash.load_one_signature(nomatch_out)
